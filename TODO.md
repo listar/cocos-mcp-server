@@ -22,77 +22,80 @@ This roadmap tracks work after the security and protocol stabilization pass. Pri
 - [x] Remove vulnerable `uuid` usage and update dependencies to a clean audit.
 - [x] Update the control panel and connection documentation for authentication.
 
-## P1 Reliability
+## P1 Reliability Implemented
+
+Implementation and verification are complete. `npm test` passes in the bundled Cocos 3.8.8 Electron runtime, and `npm run test:editor` completed the full Cocos 3.8.8 GUI workflow on June 7, 2026. The harness isolates its runtime directories and warms AssetDB/Scene before mutation tests; see `docs/editor-smoke.md`.
 
 ### P1-01 Verify the actual Cocos runtime
 
-- [ ] Record the Node.js and Electron versions used by supported Cocos Creator 3.8 releases.
-- [ ] Verify that `@modelcontextprotocol/sdk@1.29.x` runs inside each target editor runtime.
-- [ ] Define the exact supported Cocos patch versions instead of claiming all 3.8.x releases.
+- [x] Record the Node.js and Electron versions used by supported Cocos Creator releases.
+- [x] Verify that `@modelcontextprotocol/sdk@1.29.x` runs inside the target editor runtime.
+- [x] Define the exact supported Cocos patch version: 3.8.8.
 
 Done when: the compatibility matrix contains tested editor versions and a start/connect/tools-list smoke result for each.
 
 ### P1-02 Make prefab operations project-independent
 
-- [ ] Remove hard-coded `/Users/lizhiyong/NewProject_3` fallback paths from `prefab-tools.ts`.
-- [ ] Resolve all filesystem paths from `Editor.Project.path`.
-- [ ] Audit prefab methods for undocumented Cocos messages and misleading success results.
-- [ ] Verify create, instantiate, update, revert, duplicate, and restore flows in a real project.
+- [x] Remove hard-coded `/Users/lizhiyong/NewProject_3` fallback paths from `prefab-tools.ts`.
+- [x] Resolve all filesystem paths from `Editor.Project.path`.
+- [x] Replace the historical custom serializer and undocumented messages with verified Cocos 3.8.8 flows.
+- [x] Cover load, instantiate, revert, duplicate, and restore in the editor harness; intentionally omit unsupported create/update tools.
 
 Done when: prefab tools contain no machine-specific paths and the core workflows pass an editor integration checklist.
 
 ### P1-03 Reconcile tool configurations
 
-- [ ] Add newly introduced tools to existing saved configurations.
-- [ ] Remove stale tools that no longer exist.
-- [ ] Preserve user choices while applying security defaults to new dangerous tools.
-- [ ] Validate imported configuration structure, known categories, tool names, and field types.
-- [ ] Add a configuration schema version and migration tests.
+- [x] Add newly introduced tools to existing saved configurations.
+- [x] Remove stale tools that no longer exist.
+- [x] Preserve user choices while applying security defaults to new dangerous tools.
+- [x] Validate imported configuration structure, known categories, tool names, duplicates, and field types.
+- [x] Add a configuration schema version and migration tests.
 
 Done when: upgrading the extension cannot silently hide new safe tools or retain removed tools.
 
 ### P1-04 Add real editor smoke tests
 
-- [ ] Create a small fixture Cocos project.
-- [ ] Test scene open/save, node CRUD, component CRUD, property mutation, and prefab restore.
-- [ ] Verify scene-view messages in both 2D and 3D modes.
-- [ ] Verify extension reload, auto-start, settings update, and clean shutdown.
-- [ ] Document expected editor state before and after each smoke case.
+- [x] Generate a small isolated Cocos fixture project.
+- [x] Cover scene open/save, node CRUD, component CRUD, property mutation, and prefab restore.
+- [x] Verify scene-view messages in both 2D and 3D modes.
+- [x] Verify editor restart, auto-start, settings update, and clean shutdown.
+- [x] Isolate the editor profile, home, cache, and temporary directories and warm runtime assets before mutations.
+- [x] Document expected editor state before and after each smoke case.
 
 Done when: a repeatable checklist or harness validates the highest-risk workflows in Cocos Creator.
 
 ### P1-05 Fix incomplete tool semantics
 
-- [ ] Either implement `node_duplicate_node.includeChildren` or remove the unused argument.
-- [ ] Rename or redesign `project_run_project` and `project_build_project`, which currently open the Builder UI rather than completing those operations.
-- [ ] Review tools that return success after a fallback or partial action.
-- [ ] Standardize verification data for mutation tools.
+- [x] Remove the unused `node_duplicate_node.includeChildren` argument.
+- [x] Remove misleading `project_run_project` and `project_build_project`; retain the truthful `open_build_panel`.
+- [x] Remove unsupported prefab create/update paths and review fallback/partial-success results.
+- [x] Add or standardize verification data for the audited mutation tools.
 
 Done when: tool names, descriptions, results, and actual editor effects agree.
 
 ### P1-06 Harden session and HTTP behavior
 
-- [ ] Add scheduled idle-session cleanup instead of cleanup only on incoming requests.
-- [ ] Add tests for session deletion, idle expiry, maximum sessions, and shutdown with an open SSE stream.
-- [ ] Add tests for body limits, tool timeout, REST gating, CORS preflight, and `tools/list_changed`.
-- [ ] Separate active HTTP request limits from maximum MCP session limits.
+- [x] Add scheduled idle-session cleanup instead of cleanup only on incoming requests.
+- [x] Add tests for session deletion, idle expiry, maximum sessions, and shutdown with an open SSE stream.
+- [x] Add tests for body limits, tool timeout, REST gating, CORS preflight, and `tools/list_changed`.
+- [x] Separate active HTTP request limits from maximum MCP session limits.
 
 Done when: lifecycle and limit behavior is deterministic under concurrent clients.
 
 ### P1-07 Audit security classification
 
-- [ ] Replace prefix-based read-only inference with explicit per-tool metadata.
-- [ ] Review all 157 tools for destructive, idempotent, read-only, and open-world annotations.
-- [ ] Decide whether filesystem-writing and external-opening tools should require confirmation.
-- [ ] Add tests that every arbitrary-code execution tool remains disabled by default.
+- [x] Replace prefix-based read-only inference with explicit per-tool metadata.
+- [x] Review all 153 tools for destructive, idempotent, read-only, and open-world annotations.
+- [x] Require confirmation for reviewed filesystem-writing and external-opening tools.
+- [x] Add tests that every arbitrary-code execution tool remains disabled by default.
 
 Done when: annotations and confirmation policy are explicit and reviewed for every tool.
 
 ### P1-08 Reduce noisy and sensitive logging
 
-- [ ] Remove unconditional debug logs from component and prefab paths.
-- [ ] Route diagnostic output through `enableDebugLog`.
-- [ ] Ensure tokens, request bodies, scripts, and project-sensitive values are never logged.
+- [x] Remove unconditional debug logs from component, node, and prefab paths.
+- [x] Route diagnostic output through `enableDebugLog`.
+- [x] Redact tokens, request bodies, scripts, values, detail objects, and user paths, with regression coverage.
 
 Done when: normal operation is quiet and debug logging has a documented redaction policy.
 
@@ -170,4 +173,4 @@ Done when: each release has a versioned artifact, migration notes, and reproduci
 
 - Remote network binding is not planned while authentication is a single local token.
 - Arbitrary script and component-method execution should remain opt-in and confirmation-gated.
-- Automated tests should not claim editor compatibility until they run against a real Cocos Creator instance.
+- GUI compatibility claims require a successful full `npm run test:editor` result. Release automation should use the default standalone mode; intentional concurrent maintenance runs must use the isolated override documented in `docs/editor-smoke.md`.

@@ -3,6 +3,7 @@
 import { readFileSync } from 'fs-extra';
 import { join } from 'path';
 import { createApp, App, defineComponent, ref, computed, onMounted, watch } from 'vue';
+import { errorLog } from '../../logger';
 
 const panelDataMap = new WeakMap<any, App>();
 
@@ -18,6 +19,8 @@ interface ServerSettings {
     autoStart: boolean;
     debugLog: boolean;
     maxConnections: number;
+    maxSessions: number;
+    sessionIdleTimeoutMs: number;
     authToken: string;
     allowedOrigins: string;
     requestBodyLimitBytes: number;
@@ -74,6 +77,8 @@ module.exports = Editor.Panel.define({
                     autoStart: false,
                     debugLog: false,
                     maxConnections: 10,
+                    maxSessions: 10,
+                    sessionIdleTimeoutMs: 30 * 60 * 1000,
                     authToken: '',
                     allowedOrigins: '',
                     requestBodyLimitBytes: 1024 * 1024,
@@ -110,6 +115,8 @@ module.exports = Editor.Panel.define({
                                 autoStart: settings.value.autoStart,
                                 enableDebugLog: settings.value.debugLog,
                                 maxConnections: settings.value.maxConnections,
+                                maxSessions: settings.value.maxSessions,
+                                sessionIdleTimeoutMs: settings.value.sessionIdleTimeoutMs,
                                 authToken: settings.value.authToken,
                                 allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
                                 requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
@@ -120,7 +127,7 @@ module.exports = Editor.Panel.define({
                             await Editor.Message.request('cocos-mcp-server', 'start-server');
                         }
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to toggle server:', error);
+                        errorLog('MCP Panel', 'Failed to toggle server', error);
                     }
                 };
 
@@ -131,6 +138,8 @@ module.exports = Editor.Panel.define({
                             autoStart: settings.value.autoStart,
                             enableDebugLog: settings.value.debugLog,
                             maxConnections: settings.value.maxConnections,
+                            maxSessions: settings.value.maxSessions,
+                            sessionIdleTimeoutMs: settings.value.sessionIdleTimeoutMs,
                             authToken: settings.value.authToken,
                             allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
                             requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
@@ -140,7 +149,7 @@ module.exports = Editor.Panel.define({
                         await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
                         settingsChanged.value = false;
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to save settings:', error);
+                        errorLog('MCP Panel', 'Failed to save settings', error);
                     }
                 };
 
@@ -148,7 +157,7 @@ module.exports = Editor.Panel.define({
                     try {
                         await navigator.clipboard.writeText(httpUrl.value);
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to copy URL:', error);
+                        errorLog('MCP Panel', 'Failed to copy URL', error);
                     }
                 };
 
@@ -156,7 +165,7 @@ module.exports = Editor.Panel.define({
                     try {
                         await navigator.clipboard.writeText(settings.value.authToken);
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to copy auth token:', error);
+                        errorLog('MCP Panel', 'Failed to copy auth token', error);
                     }
                 };
 
@@ -176,7 +185,7 @@ module.exports = Editor.Panel.define({
                             toolCategories.value = Array.from(categories);
                         }
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to load tool manager state:', error);
+                        errorLog('MCP Panel', 'Failed to load tool manager state', error);
                     }
                 };
 
@@ -200,7 +209,7 @@ module.exports = Editor.Panel.define({
                             availableTools.value[toolIndex].enabled = !enabled;
                             availableTools.value = [...availableTools.value];
                         }
-                        console.error('[MCP Panel] Failed to update tool status:', error);
+                        errorLog('MCP Panel', 'Failed to update tool status', error);
                     }
                 };
 
@@ -213,7 +222,7 @@ module.exports = Editor.Panel.define({
                         }));
                         await Editor.Message.request('cocos-mcp-server', 'updateToolStatusBatch', updates);
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to save tool changes:', error);
+                        errorLog('MCP Panel', 'Failed to save tool changes', error);
                     }
                 };
 
@@ -255,6 +264,8 @@ module.exports = Editor.Panel.define({
                                 autoStart: status.settings.autoStart ?? false,
                                 debugLog: status.settings.enableDebugLog ?? false,
                                 maxConnections: status.settings.maxConnections ?? 10,
+                                maxSessions: status.settings.maxSessions ?? 10,
+                                sessionIdleTimeoutMs: status.settings.sessionIdleTimeoutMs ?? 30 * 60 * 1000,
                                 authToken: status.settings.authToken ?? '',
                                 allowedOrigins: (status.settings.allowedOrigins ?? []).join(', '),
                                 requestBodyLimitBytes: status.settings.requestBodyLimitBytes ?? 1024 * 1024,
@@ -264,7 +275,7 @@ module.exports = Editor.Panel.define({
                             settingsChanged.value = false;
                         }
                     } catch (error) {
-                        console.error('[MCP Panel] Failed to load server settings:', error);
+                        errorLog('MCP Panel', 'Failed to load server settings', error);
                     }
 
                     setInterval(async () => {
@@ -278,7 +289,7 @@ module.exports = Editor.Panel.define({
                                 isProcessing.value = false;
                             }
                         } catch (error) {
-                            console.error('[MCP Panel] Failed to poll server status:', error);
+                            errorLog('MCP Panel', 'Failed to poll server status', error);
                         }
                     }, 2000);
                 });

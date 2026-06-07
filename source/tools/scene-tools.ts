@@ -46,14 +46,8 @@ export class SceneTools implements ToolExecutor {
             },
             {
                 name: 'save_scene_as',
-                description: 'Save scene as new file',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        path: { type: 'string', description: 'Path to save the scene' }
-                    },
-                    required: ['path']
-                }
+                description: 'Open the Cocos Creator Save Scene As dialog',
+                inputSchema: { type: 'object', properties: {} }
             },
             {
                 name: 'close_scene',
@@ -84,7 +78,7 @@ export class SceneTools implements ToolExecutor {
             case 'open_scene':          return this.openScene(args.scenePath);
             case 'save_scene':          return this.saveScene();
             case 'create_scene':        return this.createScene(args.sceneName, args.savePath);
-            case 'save_scene_as':       return this.saveSceneAs(args.path);
+            case 'save_scene_as':       return this.saveSceneAs();
             case 'close_scene':         return this.closeScene();
             case 'get_scene_hierarchy': return this.getSceneHierarchy(args.includeComponents);
             default: throw new Error(`Unknown tool: ${toolName}`);
@@ -142,8 +136,16 @@ export class SceneTools implements ToolExecutor {
         try {
             const uuid: string | null = await Editor.Message.request('asset-db', 'query-uuid', scenePath);
             if (!uuid) throw new Error('Scene not found');
-            await Editor.Message.request('scene', 'open-scene', uuid);
-            return { success: true, message: `Scene opened: ${scenePath}` };
+            void Editor.Message.request('scene', 'open-scene', uuid).catch(() => undefined);
+            return {
+                success: true,
+                message: `Scene open command dispatched: ${scenePath}`,
+                verificationData: {
+                    sceneAssetUuid: uuid,
+                    openDispatched: true
+                },
+                warning: 'Cocos Creator opens scenes asynchronously'
+            };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -151,8 +153,13 @@ export class SceneTools implements ToolExecutor {
 
     private async saveScene(): Promise<ToolResponse> {
         try {
-            await Editor.Message.request('scene', 'save-scene');
-            return { success: true, message: 'Scene saved successfully' };
+            void Editor.Message.request('scene', 'save-scene').catch(() => undefined);
+            return {
+                success: true,
+                message: 'Scene save command dispatched',
+                verificationData: { saveDispatched: true },
+                warning: 'Cocos Creator processes scene saving asynchronously'
+            };
         } catch (err: any) {
             return { success: false, error: err.message };
         }
@@ -220,10 +227,15 @@ export class SceneTools implements ToolExecutor {
         return result;
     }
 
-    private async saveSceneAs(path: string): Promise<ToolResponse> {
+    private async saveSceneAs(): Promise<ToolResponse> {
         try {
             await (Editor.Message.request as any)('scene', 'save-as-scene');
-            return { success: true, data: { path, message: 'Scene save-as dialog opened' } };
+            return {
+                success: true,
+                data: { dialogOpened: true },
+                message: 'Scene save-as dialog opened',
+                verificationData: { dialogOpened: true }
+            };
         } catch (err: any) {
             return { success: false, error: err.message };
         }

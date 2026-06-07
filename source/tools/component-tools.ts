@@ -1,4 +1,5 @@
 import { ToolDefinition, ToolResponse, ToolExecutor, ComponentInfo } from '../types';
+import { debugLog } from '../logger';
 
 export class ComponentTools implements ToolExecutor {
     getTools(): ToolDefinition[] {
@@ -328,7 +329,7 @@ export class ComponentTools implements ToolExecutor {
                 if (nodeData && nodeData.__comps__) {
                     const components = nodeData.__comps__.map((comp: any) => ({
                         type: comp.__type__ || comp.cid || comp.type || 'Unknown',
-                        uuid: comp.uuid?.value || comp.uuid || null,
+                        uuid: comp.value?.uuid?.value || comp.uuid?.value || comp.uuid || null,
                         enabled: comp.enabled !== undefined ? comp.enabled : true,
                         properties: this.extractComponentProperties(comp)
                     }));
@@ -427,11 +428,11 @@ export class ComponentTools implements ToolExecutor {
     }
 
     private extractComponentProperties(component: any): Record<string, any> {
-        console.log(`[extractComponentProperties] Processing component:`, Object.keys(component));
+        debugLog('ComponentTools', `[extractComponentProperties] Processing component:`, Object.keys(component));
         
         // Check if component has a value property containing actual component attributes
         if (component.value && typeof component.value === 'object') {
-            console.log(`[extractComponentProperties] Found component.value with properties:`, Object.keys(component.value));
+            debugLog('ComponentTools', `[extractComponentProperties] Found component.value with properties:`, Object.keys(component.value));
             return component.value; // Return value object which contains all component properties
         }
         
@@ -441,24 +442,24 @@ export class ComponentTools implements ToolExecutor {
         
         for (const key in component) {
             if (!excludeKeys.includes(key) && !key.startsWith('_')) {
-                console.log(`[extractComponentProperties] Found direct property '${key}':`, typeof component[key]);
+                debugLog('ComponentTools', `[extractComponentProperties] Found direct property '${key}':`, typeof component[key]);
                 properties[key] = component[key];
             }
         }
         
-        console.log(`[extractComponentProperties] Final extracted properties:`, Object.keys(properties));
+        debugLog('ComponentTools', `[extractComponentProperties] Final extracted properties:`, Object.keys(properties));
         return properties;
     }
 
     private async findComponentTypeByUuid(componentUuid: string): Promise<string | null> {
-        console.log(`[findComponentTypeByUuid] Searching for component type with UUID: ${componentUuid}`);
+        debugLog('ComponentTools', `[findComponentTypeByUuid] Searching for component type with UUID: ${componentUuid}`);
         if (!componentUuid) {
             return null;
         }
         try {
             const nodeTree = await Editor.Message.request('scene', 'query-node-tree');
             if (!nodeTree) {
-                console.warn('[findComponentTypeByUuid] Failed to query node tree.');
+                debugLog('ComponentTools', '[findComponentTypeByUuid] Failed to query node tree.');
                 return null;
             }
 
@@ -478,13 +479,13 @@ export class ComponentTools implements ToolExecutor {
                             // The component UUID is nested in the 'value' property
                             if (compAny.uuid && compAny.uuid.value === componentUuid) {
                                 const componentType = compAny.__type__;
-                                console.log(`[findComponentTypeByUuid] Found component type '${componentType}' for UUID ${componentUuid} on node ${fullNodeData.name?.value}`);
+                                debugLog('ComponentTools', `[findComponentTypeByUuid] Found component type '${componentType}' for UUID ${componentUuid} on node ${fullNodeData.name?.value}`);
                                 return componentType;
                             }
                         }
                     }
                 } catch (e) {
-                    console.warn(`[findComponentTypeByUuid] Could not query node ${currentNodeInfo.uuid}:`, e);
+                    debugLog('ComponentTools', `[findComponentTypeByUuid] Could not query node ${currentNodeInfo.uuid}:`, e);
                 }
 
                 if (currentNodeInfo.children) {
@@ -494,10 +495,10 @@ export class ComponentTools implements ToolExecutor {
                 }
             }
 
-            console.warn(`[findComponentTypeByUuid] Component with UUID ${componentUuid} not found in scene tree.`);
+            debugLog('ComponentTools', `[findComponentTypeByUuid] Component with UUID ${componentUuid} not found in scene tree.`);
             return null;
         } catch (error) {
-            console.error(`[findComponentTypeByUuid] Error while searching for component type:`, error);
+            debugLog('ComponentTools', `[findComponentTypeByUuid] Error while searching for component type:`, error);
             return null;
         }
     }
@@ -507,7 +508,7 @@ export class ComponentTools implements ToolExecutor {
         
         return new Promise(async (resolve) => {
             try {
-                console.log(`[ComponentTools] Setting ${componentType}.${property} (type: ${propertyType}) = ${JSON.stringify(value)} on node ${nodeUuid}`);
+                debugLog('ComponentTools', `[ComponentTools] Setting ${componentType}.${property} (type: ${propertyType}) = ${JSON.stringify(value)} on node ${nodeUuid}`);
                 
                 // Step 0: Detect node-level properties and redirect to the appropriate node method
                 const nodeRedirectResult = await this.checkAndRedirectNodeProperties(args);
@@ -557,10 +558,10 @@ export class ComponentTools implements ToolExecutor {
                 // Step 3: Auto-detect and convert property value
                 let propertyInfo;
                 try {
-                    console.log(`[ComponentTools] Analyzing property: ${property}`);
+                    debugLog('ComponentTools', `[ComponentTools] Analyzing property: ${property}`);
                     propertyInfo = this.analyzeProperty(targetComponent, property);
                 } catch (analyzeError: any) {
-                    console.error(`[ComponentTools] Error in analyzeProperty:`, analyzeError);
+                    debugLog('ComponentTools', `[ComponentTools] Error in analyzeProperty:`, analyzeError);
                     resolve({
                         success: false,
                         error: `Failed to analyze property '${property}': ${analyzeError.message}`
@@ -713,9 +714,9 @@ export class ComponentTools implements ToolExecutor {
                         throw new Error(`Unsupported property type: ${propertyType}`);
                 }
                 
-                console.log(`[ComponentTools] Converting value: ${JSON.stringify(value)} -> ${JSON.stringify(processedValue)} (type: ${propertyType})`);
-                console.log(`[ComponentTools] Property analysis result: propertyInfo.type="${propertyInfo.type}", propertyType="${propertyType}"`);
-                console.log(`[ComponentTools] Will use color special handling: ${propertyType === 'color' && processedValue && typeof processedValue === 'object'}`);
+                debugLog('ComponentTools', `[ComponentTools] Converting value: ${JSON.stringify(value)} -> ${JSON.stringify(processedValue)} (type: ${propertyType})`);
+                debugLog('ComponentTools', `[ComponentTools] Property analysis result: propertyInfo.type="${propertyInfo.type}", propertyType="${propertyType}"`);
+                debugLog('ComponentTools', `[ComponentTools] Will use color special handling: ${propertyType === 'color' && processedValue && typeof processedValue === 'object'}`);
                 
                 // Actual expected value for verification (component refs need special handling)
                 let actualExpectedValue = processedValue;
@@ -756,7 +757,7 @@ export class ComponentTools implements ToolExecutor {
                 if (propertyType === 'asset' || propertyType === 'spriteFrame' || propertyType === 'prefab' || 
                     (propertyInfo.type === 'asset' && propertyType === 'string')) {
                     
-                    console.log(`[ComponentTools] Setting asset reference:`, {
+                    debugLog('ComponentTools', `[ComponentTools] Setting asset reference:`, {
                         value: processedValue,
                         property: property,
                         propertyType: propertyType,
@@ -831,7 +832,7 @@ export class ComponentTools implements ToolExecutor {
                         a: processedValue.a !== undefined ? Math.min(255, Math.max(0, Number(processedValue.a))) : 255
                     };
                     
-                    console.log(`[ComponentTools] Setting color value:`, colorValue);
+                    debugLog('ComponentTools', `[ComponentTools] Setting color value:`, colorValue);
                     
                     await Editor.Message.request('scene', 'set-property', {
                         uuid: nodeUuid,
@@ -889,7 +890,7 @@ export class ComponentTools implements ToolExecutor {
                     });
                 } else if (propertyType === 'node' && processedValue && typeof processedValue === 'object' && 'uuid' in processedValue) {
                     // Special handling for node references
-                    console.log(`[ComponentTools] Setting node reference with UUID: ${processedValue.uuid}`);
+                    debugLog('ComponentTools', `[ComponentTools] Setting node reference with UUID: ${processedValue.uuid}`);
                     await Editor.Message.request('scene', 'set-property', {
                         uuid: nodeUuid,
                         path: propertyPath,
@@ -901,7 +902,7 @@ export class ComponentTools implements ToolExecutor {
                 } else if (propertyType === 'component' && typeof processedValue === 'string') {
                     // Special handling for component references: find __id__ via node UUID
                     const targetNodeUuid = processedValue;
-                    console.log(`[ComponentTools] Setting component reference - finding component on node: ${targetNodeUuid}`);
+                    debugLog('ComponentTools', `[ComponentTools] Setting component reference - finding component on node: ${targetNodeUuid}`);
                     
                     // Get expected component type from current component attribute metadata
                     let expectedComponentType = '';
@@ -935,7 +936,7 @@ export class ComponentTools implements ToolExecutor {
                         throw new Error(`Unable to determine required component type for property '${property}' on component '${componentType}'. Property metadata may not contain type information.`);
                     }
                     
-                    console.log(`[ComponentTools] Detected required component type: ${expectedComponentType} for property: ${property}`);
+                    debugLog('ComponentTools', `[ComponentTools] Detected required component type: ${expectedComponentType} for property: ${property}`);
                     
                     try {
                         // Get component info for target node
@@ -945,10 +946,10 @@ export class ComponentTools implements ToolExecutor {
                         }
                         
                         // Log target node component overview
-                        console.log(`[ComponentTools] Target node ${targetNodeUuid} has ${targetNodeData.__comps__.length} components:`);
+                        debugLog('ComponentTools', `[ComponentTools] Target node ${targetNodeUuid} has ${targetNodeData.__comps__.length} components:`);
                         targetNodeData.__comps__.forEach((comp: any, index: number) => {
                             const sceneId = comp.value && comp.value.uuid && comp.value.uuid.value ? comp.value.uuid.value : 'unknown';
-                            console.log(`[ComponentTools] Component ${index}: ${comp.type} (scene_id: ${sceneId})`);
+                            debugLog('ComponentTools', `[ComponentTools] Component ${index}: ${comp.type} (scene_id: ${sceneId})`);
                         });
                         
                         // Find matching component
@@ -957,22 +958,22 @@ export class ComponentTools implements ToolExecutor {
                         
                         // Search _components array for specified component type
                         // Note: __comps__ and _components share the same index
-                        console.log(`[ComponentTools] Searching for component type: ${expectedComponentType}`);
+                        debugLog('ComponentTools', `[ComponentTools] Searching for component type: ${expectedComponentType}`);
                         
                         for (let i = 0; i < targetNodeData.__comps__.length; i++) {
                             const comp = targetNodeData.__comps__[i] as any;
-                            console.log(`[ComponentTools] Checking component ${i}: type=${comp.type}, target=${expectedComponentType}`);
+                            debugLog('ComponentTools', `[ComponentTools] Checking component ${i}: type=${comp.type}, target=${expectedComponentType}`);
                             
                             if (comp.type === expectedComponentType) {
                                 targetComponent = comp;
-                                console.log(`[ComponentTools] Found matching component at index ${i}: ${comp.type}`);
+                                debugLog('ComponentTools', `[ComponentTools] Found matching component at index ${i}: ${comp.type}`);
                                 
                                 // Get scene ID from component value.uuid.value
                                 if (comp.value && comp.value.uuid && comp.value.uuid.value) {
                                     componentId = comp.value.uuid.value;
-                                    console.log(`[ComponentTools] Got componentId from comp.value.uuid.value: ${componentId}`);
+                                    debugLog('ComponentTools', `[ComponentTools] Got componentId from comp.value.uuid.value: ${componentId}`);
                                 } else {
-                                    console.log(`[ComponentTools] Component structure:`, {
+                                    debugLog('ComponentTools', `[ComponentTools] Component structure:`, {
                                         hasValue: !!comp.value,
                                         hasUuid: !!(comp.value && comp.value.uuid),
                                         hasUuidValue: !!(comp.value && comp.value.uuid && comp.value.uuid.value),
@@ -998,7 +999,7 @@ export class ComponentTools implements ToolExecutor {
                             throw new Error(`Component type '${expectedComponentType}' not found on node ${targetNodeUuid}. Available components: ${availableComponents.join(', ')}`);
                         }
                         
-                        console.log(`[ComponentTools] Found component ${expectedComponentType} with scene ID: ${componentId} on node ${targetNodeUuid}`);
+                        debugLog('ComponentTools', `[ComponentTools] Found component ${expectedComponentType} with scene ID: ${componentId} on node ${targetNodeUuid}`);
                         
                         // Update expected value to actual component ID object format for later verification
                         if (componentId) {
@@ -1017,12 +1018,12 @@ export class ComponentTools implements ToolExecutor {
                         });
                         
                     } catch (error) {
-                        console.error(`[ComponentTools] Error setting component reference:`, error);
+                        debugLog('ComponentTools', `[ComponentTools] Error setting component reference:`, error);
                         throw error;
                     }
                 } else if (propertyType === 'nodeArray' && Array.isArray(processedValue)) {
                     // Special handling for node arrays - preserve pre-processed format
-                    console.log(`[ComponentTools] Setting node array:`, processedValue);
+                    debugLog('ComponentTools', `[ComponentTools] Setting node array:`, processedValue);
                     
                     await Editor.Message.request('scene', 'set-property', {
                         uuid: nodeUuid,
@@ -1081,7 +1082,7 @@ export class ComponentTools implements ToolExecutor {
                 });
                 
             } catch (error: any) {
-                console.error(`[ComponentTools] Error setting property:`, error);
+                debugLog('ComponentTools', `[ComponentTools] Error setting property:`, error);
                 resolve({
                     success: false,
                     error: `Failed to set property: ${error.message}`
@@ -1241,7 +1242,7 @@ export class ComponentTools implements ToolExecutor {
             
             return hasValidStructure;
         } catch (error) {
-            console.warn(`[isValidPropertyDescriptor] Error checking property descriptor:`, error);
+            debugLog('ComponentTools', `[isValidPropertyDescriptor] Error checking property descriptor:`, error);
             return false;
         }
     }
@@ -1371,7 +1372,7 @@ export class ComponentTools implements ToolExecutor {
                     type = 'object';
                 }
             } catch (error) {
-                console.warn(`[analyzeProperty] Error checking property type for: ${JSON.stringify(propertyValue)}`);
+                debugLog('ComponentTools', `[analyzeProperty] Error checking property type for: ${JSON.stringify(propertyValue)}`);
                 type = 'object';
             }
         } else if (propertyValue === null || propertyValue === undefined) {
@@ -1399,7 +1400,7 @@ export class ComponentTools implements ToolExecutor {
     private smartConvertValue(inputValue: any, propertyInfo: any): any {
         const { type, originalValue } = propertyInfo;
         
-        console.log(`[smartConvertValue] Converting ${JSON.stringify(inputValue)} to type: ${type}`);
+        debugLog('ComponentTools', `[smartConvertValue] Converting ${JSON.stringify(inputValue)} to type: ${type}`);
         
         switch (type) {
             case 'string':
@@ -1433,7 +1434,7 @@ export class ComponentTools implements ToolExecutor {
                             };
                         }
                     } catch (error) {
-                        console.warn(`[smartConvertValue] Invalid color object: ${JSON.stringify(inputValue)}`);
+                        debugLog('ComponentTools', `[smartConvertValue] Invalid color object: ${JSON.stringify(inputValue)}`);
                     }
                 }
                 // Keep original value structure and update provided fields
@@ -1447,11 +1448,11 @@ export class ComponentTools implements ToolExecutor {
                             a: inputKeys.includes('a') ? Math.min(255, Math.max(0, Number(inputValue.a))) : (originalValue.a || 255)
                         };
                     } catch (error) {
-                        console.warn(`[smartConvertValue] Error processing color with original value: ${error}`);
+                        debugLog('ComponentTools', `[smartConvertValue] Error processing color with original value: ${error}`);
                     }
                 }
                 // Default to white
-                console.warn(`[smartConvertValue] Using default white color for invalid input: ${JSON.stringify(inputValue)}`);
+                debugLog('ComponentTools', `[smartConvertValue] Using default white color for invalid input: ${JSON.stringify(inputValue)}`);
                 return { r: 255, g: 255, b: 255, a: 255 };
                 
             case 'vec2':
@@ -1534,35 +1535,35 @@ export class ComponentTools implements ToolExecutor {
     }
 
     private async verifyPropertyChange(nodeUuid: string, componentType: string, property: string, originalValue: any, expectedValue: any): Promise<{ verified: boolean; actualValue: any; fullData: any }> {
-        console.log(`[verifyPropertyChange] Starting verification for ${componentType}.${property}`);
-        console.log(`[verifyPropertyChange] Expected value:`, JSON.stringify(expectedValue));
-        console.log(`[verifyPropertyChange] Original value:`, JSON.stringify(originalValue));
+        debugLog('ComponentTools', `[verifyPropertyChange] Starting verification for ${componentType}.${property}`);
+        debugLog('ComponentTools', `[verifyPropertyChange] Expected value:`, JSON.stringify(expectedValue));
+        debugLog('ComponentTools', `[verifyPropertyChange] Original value:`, JSON.stringify(originalValue));
         
         try {
             // Re-fetch component info for verification
-            console.log(`[verifyPropertyChange] Calling getComponentInfo...`);
+            debugLog('ComponentTools', `[verifyPropertyChange] Calling getComponentInfo...`);
             const componentInfo = await this.getComponentInfo(nodeUuid, componentType);
-            console.log(`[verifyPropertyChange] getComponentInfo success:`, componentInfo.success);
+            debugLog('ComponentTools', `[verifyPropertyChange] getComponentInfo success:`, componentInfo.success);
             
             const allComponents = await this.getComponents(nodeUuid);
-            console.log(`[verifyPropertyChange] getComponents success:`, allComponents.success);
+            debugLog('ComponentTools', `[verifyPropertyChange] getComponents success:`, allComponents.success);
             
             if (componentInfo.success && componentInfo.data) {
-                console.log(`[verifyPropertyChange] Component data available, extracting property '${property}'`);
+                debugLog('ComponentTools', `[verifyPropertyChange] Component data available, extracting property '${property}'`);
                 const allPropertyNames = Object.keys(componentInfo.data.properties || {});
-                console.log(`[verifyPropertyChange] Available properties:`, allPropertyNames);
+                debugLog('ComponentTools', `[verifyPropertyChange] Available properties:`, allPropertyNames);
                 const propertyData = componentInfo.data.properties?.[property];
-                console.log(`[verifyPropertyChange] Raw property data for '${property}':`, JSON.stringify(propertyData));
+                debugLog('ComponentTools', `[verifyPropertyChange] Raw property data for '${property}':`, JSON.stringify(propertyData));
                 
                 // Extract actual value from property data
                 let actualValue = propertyData;
-                console.log(`[verifyPropertyChange] Initial actualValue:`, JSON.stringify(actualValue));
+                debugLog('ComponentTools', `[verifyPropertyChange] Initial actualValue:`, JSON.stringify(actualValue));
                 
                 if (propertyData && typeof propertyData === 'object' && 'value' in propertyData) {
                     actualValue = propertyData.value;
-                    console.log(`[verifyPropertyChange] Extracted actualValue from .value:`, JSON.stringify(actualValue));
+                    debugLog('ComponentTools', `[verifyPropertyChange] Extracted actualValue from .value:`, JSON.stringify(actualValue));
                 } else {
-                    console.log(`[verifyPropertyChange] No .value property found, using raw data`);
+                    debugLog('ComponentTools', `[verifyPropertyChange] No .value property found, using raw data`);
                 }
                 
                 // Check whether actual value matches expected value
@@ -1574,41 +1575,41 @@ export class ComponentTools implements ToolExecutor {
                     const expectedUuid = expectedValue.uuid || '';
                     verified = actualUuid === expectedUuid && expectedUuid !== '';
                     
-                    console.log(`[verifyPropertyChange] Reference comparison:`);
-                    console.log(`  - Expected UUID: "${expectedUuid}"`);
-                    console.log(`  - Actual UUID: "${actualUuid}"`);
-                    console.log(`  - UUID match: ${actualUuid === expectedUuid}`);
-                    console.log(`  - UUID not empty: ${expectedUuid !== ''}`);
-                    console.log(`  - Final verified: ${verified}`);
+                    debugLog('ComponentTools', `[verifyPropertyChange] Reference comparison:`);
+                    debugLog('ComponentTools', `  - Expected UUID: "${expectedUuid}"`);
+                    debugLog('ComponentTools', `  - Actual UUID: "${actualUuid}"`);
+                    debugLog('ComponentTools', `  - UUID match: ${actualUuid === expectedUuid}`);
+                    debugLog('ComponentTools', `  - UUID not empty: ${expectedUuid !== ''}`);
+                    debugLog('ComponentTools', `  - Final verified: ${verified}`);
                 } else {
                     // For other types, compare values directly
-                    console.log(`[verifyPropertyChange] Value comparison:`);
-                    console.log(`  - Expected type: ${typeof expectedValue}`);
-                    console.log(`  - Actual type: ${typeof actualValue}`);
+                    debugLog('ComponentTools', `[verifyPropertyChange] Value comparison:`);
+                    debugLog('ComponentTools', `  - Expected type: ${typeof expectedValue}`);
+                    debugLog('ComponentTools', `  - Actual type: ${typeof actualValue}`);
                     
                     if (typeof actualValue === typeof expectedValue) {
                         if (typeof actualValue === 'object' && actualValue !== null && expectedValue !== null) {
                             // Deep comparison for object types
                             verified = JSON.stringify(actualValue) === JSON.stringify(expectedValue);
-                            console.log(`  - Object comparison (JSON): ${verified}`);
+                            debugLog('ComponentTools', `  - Object comparison (JSON): ${verified}`);
                         } else {
                             // Direct comparison for primitive types
                             verified = actualValue === expectedValue;
-                            console.log(`  - Direct comparison: ${verified}`);
+                            debugLog('ComponentTools', `  - Direct comparison: ${verified}`);
                         }
                     } else {
                         // Special handling for type mismatches (e.g. number vs string)
                         const stringMatch = String(actualValue) === String(expectedValue);
                         const numberMatch = Number(actualValue) === Number(expectedValue);
                         verified = stringMatch || numberMatch;
-                        console.log(`  - String match: ${stringMatch}`);
-                        console.log(`  - Number match: ${numberMatch}`);
-                        console.log(`  - Type mismatch verified: ${verified}`);
+                        debugLog('ComponentTools', `  - String match: ${stringMatch}`);
+                        debugLog('ComponentTools', `  - Number match: ${numberMatch}`);
+                        debugLog('ComponentTools', `  - Type mismatch verified: ${verified}`);
                     }
                 }
                 
-                console.log(`[verifyPropertyChange] Final verification result: ${verified}`);
-                console.log(`[verifyPropertyChange] Final actualValue:`, JSON.stringify(actualValue));
+                debugLog('ComponentTools', `[verifyPropertyChange] Final verification result: ${verified}`);
+                debugLog('ComponentTools', `[verifyPropertyChange] Final actualValue:`, JSON.stringify(actualValue));
                 
                 const result = {
                     verified,
@@ -1632,17 +1633,17 @@ export class ComponentTools implements ToolExecutor {
                     }
                 };
                 
-                console.log(`[verifyPropertyChange] Returning result:`, JSON.stringify(result, null, 2));
+                debugLog('ComponentTools', `[verifyPropertyChange] Returning result:`, JSON.stringify(result, null, 2));
                 return result;
             } else {
-                console.log(`[verifyPropertyChange] ComponentInfo failed or no data:`, componentInfo);
+                debugLog('ComponentTools', `[verifyPropertyChange] ComponentInfo failed or no data:`, componentInfo);
             }
         } catch (error) {
-            console.error('[verifyPropertyChange] Verification failed with error:', error);
-            console.error('[verifyPropertyChange] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+            debugLog('ComponentTools', '[verifyPropertyChange] Verification failed with error:', error);
+            debugLog('ComponentTools', '[verifyPropertyChange] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         }
         
-        console.log(`[verifyPropertyChange] Returning fallback result`);
+        debugLog('ComponentTools', `[verifyPropertyChange] Returning fallback result`);
         return {
             verified: false,
             actualValue: undefined,
@@ -1773,7 +1774,7 @@ export class ComponentTools implements ToolExecutor {
                 return propertyData;
             }
         } catch (error) {
-            console.error(`[quickVerifyAsset] Error:`, error);
+            debugLog('ComponentTools', `[quickVerifyAsset] Error:`, error);
             return null;
         }
     }

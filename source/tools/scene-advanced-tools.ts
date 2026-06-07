@@ -539,16 +539,30 @@ export class SceneAdvancedTools implements ToolExecutor {
     }
 
     private async restorePrefab(nodeUuid: string): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            Editor.Message.request('scene', 'restore-prefab', { uuid: nodeUuid }).then(() => {
-                resolve({
-                    success: true,
-                    message: 'Prefab restored successfully'
-                });
-            }).catch((err: Error) => {
-                resolve({ success: false, error: err.message });
-            });
-        });
+        try {
+            const nodeData: any = await Editor.Message.request('scene', 'query-node', nodeUuid);
+            const prefab = nodeData?.__prefab__;
+            if (!prefab?.rootUuid || !prefab?.uuid) {
+                return { success: false, error: 'Node is not linked to a prefab instance' };
+            }
+            await (Editor.Message.request as any)(
+                'scene',
+                'restore-prefab',
+                prefab.rootUuid,
+                prefab.uuid
+            );
+            return {
+                success: true,
+                message: 'Prefab restored successfully',
+                verificationData: {
+                    nodeUuid,
+                    rootUuid: prefab.rootUuid,
+                    prefabUuid: prefab.uuid
+                }
+            };
+        } catch (err: any) {
+            return { success: false, error: err.message };
+        }
     }
 
     private async executeComponentMethod(uuid: string, name: string, args: any[] = []): Promise<ToolResponse> {

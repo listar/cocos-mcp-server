@@ -33,7 +33,10 @@ test('remove_component sends the component UUID', async () => {
             queryCount++;
             return {
                 __comps__: queryCount === 1
-                    ? [{ __type__: 'cc.Sprite', uuid: { value: 'component-uuid' } }]
+                    ? [{
+                        __type__: 'cc.Sprite',
+                        value: { uuid: { value: 'component-uuid' } }
+                    }]
                     : []
             };
         }
@@ -55,13 +58,59 @@ test('remove_component sends the component UUID', async () => {
 test('duplicate_node handles the documented UUID array result', async () => {
     installEditor(async () => ['copy-1']);
     const result = await new NodeTools().execute('duplicate_node', {
-        uuid: 'source',
-        includeChildren: true
+        uuid: 'source'
     });
 
     assert.equal(result.success, true);
     assert.equal(result.data.newUuid, 'copy-1');
     assert.deepEqual(result.data.newUuids, ['copy-1']);
+});
+
+test('save_scene dispatches the asynchronous editor request', async () => {
+    const calls = [];
+    global.Editor = {
+        Message: {
+            send: (...args) => calls.push(['send', ...args]),
+            request: async (...args) => {
+                calls.push(['request', ...args]);
+                return false;
+            }
+        },
+        Project: { name: 'Test', path: '/tmp/test', uuid: 'project-uuid' }
+    };
+    const { SceneTools } = require('../dist/tools/scene-tools');
+    const result = await new SceneTools().execute('save_scene', {});
+
+    assert.equal(result.success, true);
+    assert.deepEqual(calls, [
+        ['request', 'scene', 'save-scene']
+    ]);
+});
+
+test('open_scene dispatches the asynchronous editor request', async () => {
+    const calls = [];
+    global.Editor = {
+        Message: {
+            send: (...args) => calls.push(['send', ...args]),
+            request: async (...args) => {
+                calls.push(['request', ...args]);
+                if (args[0] === 'asset-db') return 'scene-asset-uuid';
+                if (args[1] === 'query-node-tree') return { uuid: 'scene-root-uuid' };
+                return undefined;
+            }
+        },
+        Project: { name: 'Test', path: '/tmp/test', uuid: 'project-uuid' }
+    };
+    const { SceneTools } = require('../dist/tools/scene-tools');
+    const result = await new SceneTools().execute('open_scene', {
+        scenePath: 'db://assets/Smoke.scene'
+    });
+
+    assert.equal(result.success, true);
+    assert.deepEqual(calls, [
+        ['request', 'asset-db', 'query-uuid', 'db://assets/Smoke.scene'],
+        ['request', 'scene', 'open-scene', 'scene-asset-uuid']
+    ]);
 });
 
 test('scene view uses align-view-with-node', async () => {
@@ -99,9 +148,20 @@ test('server IP sorting uses the supported query-ip-list message', async () => {
     ]);
 });
 
-test('prefab restore messages use the node options object', async () => {
+test('prefab restore follows the Cocos 3.8.8 inspector runtime contract', async () => {
     const calls = [];
-    installEditor(async (...args) => calls.push(args));
+    installEditor(async (...args) => {
+        calls.push(args);
+        if (args[1] === 'query-node') {
+            return {
+                __prefab__: {
+                    rootUuid: 'prefab-root-uuid',
+                    uuid: 'prefab-asset-uuid'
+                }
+            };
+        }
+        return true;
+    });
 
     const advanced = await new SceneAdvancedTools().execute('restore_prefab', {
         nodeUuid: 'node-uuid'
@@ -113,8 +173,10 @@ test('prefab restore messages use the node options object', async () => {
     assert.equal(advanced.success, true);
     assert.equal(prefab.success, true);
     assert.deepEqual(calls, [
-        ['scene', 'restore-prefab', { uuid: 'node-uuid' }],
-        ['scene', 'restore-prefab', { uuid: 'node-uuid' }]
+        ['scene', 'query-node', 'node-uuid'],
+        ['scene', 'restore-prefab', 'prefab-root-uuid', 'prefab-asset-uuid'],
+        ['scene', 'query-node', 'node-uuid'],
+        ['scene', 'restore-prefab', 'prefab-root-uuid', 'prefab-asset-uuid']
     ]);
 });
 

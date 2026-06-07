@@ -27,6 +27,7 @@ import { ReferenceImageTools } from './tools/reference-image-tools';
 import { AssetAdvancedTools } from './tools/asset-advanced-tools';
 import { ValidationTools } from './tools/validation-tools';
 import { getToolAnnotations, requiresConfirmation } from './tools/tool-security';
+import { debugLog, setDebugLogging } from './logger';
 
 const SERVER_VERSION = '1.0.0';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
@@ -85,9 +86,11 @@ export class MCPServer {
     private toolsList: ToolDefinition[] = [];
     private enabledToolNames: Set<string> | null = null;
     private activeRequests = 0;
+    private sessionCleanupTimer: NodeJS.Timeout | null = null;
 
     constructor(settings: MCPServerSettings) {
         this.settings = settings;
+        setDebugLogging(settings.enableDebugLog);
         this.initializeTools();
         this.rebuildToolsList();
     }
@@ -146,7 +149,7 @@ export class MCPServer {
             inputSchema,
             outputSchema: definition.outputSchema ?? TOOL_OUTPUT_SCHEMA,
             annotations: {
-                ...getToolAnnotations(qualifiedName, definition.name),
+                ...getToolAnnotations(qualifiedName),
                 ...(definition.annotations ?? {})
             }
         };
@@ -178,6 +181,16 @@ export class MCPServer {
                 server.listen(this.settings.port, '127.0.0.1');
             });
             this.httpServer = server;
+            const sessionIdleTimeoutMs = this.getSessionIdleTimeoutMs();
+            const cleanupInterval = Math.max(
+                250,
+                Math.min(Math.floor(sessionIdleTimeoutMs / 2), 60_000)
+            );
+            this.sessionCleanupTimer = setInterval(
+                () => this.removeExpiredProtocolRuntimes(),
+                cleanupInterval
+            );
+            this.sessionCleanupTimer.unref?.();
             this.debug(`Started on http://127.0.0.1:${this.getListeningPort()}`);
         } catch (error) {
             throw error;
@@ -187,6 +200,10 @@ export class MCPServer {
     public async stop(): Promise<void> {
         const server = this.httpServer;
         this.httpServer = null;
+        if (this.sessionCleanupTimer) {
+            clearInterval(this.sessionCleanupTimer);
+            this.sessionCleanupTimer = null;
+        }
         await this.closeAllProtocolRuntimes();
 
         if (server) {
@@ -423,7 +440,7 @@ export class MCPServer {
                 this.sendJson(res, 413, { error: error.message });
                 return;
             }
-            console.error('[MCPServer] Unhandled request error:', error);
+            debugLog('MCPServer', 'Unhandled request error', error);
             this.sendJson(res, 500, { error: 'Internal server error' });
         }
     }
@@ -450,7 +467,10 @@ export class MCPServer {
         this.removeExpiredProtocolRuntimes();
 
         if (req.method === 'POST' && this.isInitializeRequest(parsedBody)) {
-            if (this.protocolRuntimes.size >= this.settings.maxConnections) {
+            const maxSessions = Number.isFinite(this.settings.maxSessions)
+                ? this.settings.maxSessions
+                : this.settings.maxConnections;
+            if (this.protocolRuntimes.size >= maxSessions) {
                 this.sendJson(res, 429, { error: 'Maximum MCP sessions reached' });
                 return;
             }
@@ -494,7 +514,7 @@ export class MCPServer {
     }
 
     private removeExpiredProtocolRuntimes(): void {
-        const expirationTime = Date.now() - 30 * 60 * 1000;
+        const expirationTime = Date.now() - this.getSessionIdleTimeoutMs();
         for (const [sessionId, runtime] of this.protocolRuntimes) {
             if (runtime.lastActivity < expirationTime) {
                 this.protocolRuntimes.delete(sessionId);
@@ -619,6 +639,12 @@ export class MCPServer {
         return address && typeof address === 'object' ? address.port : this.settings.port;
     }
 
+    private getSessionIdleTimeoutMs(): number {
+        return Number.isFinite(this.settings.sessionIdleTimeoutMs)
+            ? this.settings.sessionIdleTimeoutMs
+            : 30 * 60 * 1000;
+    }
+
     private getSimplifiedToolsList(): unknown[] {
         return this.toolsList.map(tool => {
             const underscoreIdx = tool.name.indexOf('_');
@@ -709,8 +735,6 @@ export class MCPServer {
     }
 
     private debug(message: string): void {
-        if (this.settings.enableDebugLog) {
-            console.log(`[MCPServer] ${message}`);
-        }
+        debugLog('MCPServer', message);
     }
 }

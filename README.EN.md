@@ -2,9 +2,9 @@
 
 English | [中文](README.md)
 
-A Cocos Creator 3.8.x editor extension that exposes scene, node, component, prefab, and project operations to Codex, Claude Code, Cursor, and other AI clients over MCP Streamable HTTP.
+A Cocos Creator 3.8.8 editor extension that exposes scene, node, component, prefab, and project operations to Codex, Claude Code, Cursor, and other AI clients over MCP Streamable HTTP.
 
-The current implementation provides **157 tools in 14 categories**, uses the official `@modelcontextprotocol/sdk`, and enables local authentication and high-risk operation safeguards by default.
+The current implementation provides **153 tools in 14 categories**, uses the official `@modelcontextprotocol/sdk`, and enables local authentication and high-risk operation safeguards by default.
 
 ## Highlights
 
@@ -13,6 +13,7 @@ The current implementation provides **157 tools in 14 categories**, uses the off
 - Vue 3 control panel with server settings and per-tool enablement
 - Bearer authentication, Origin allowlist, request limits, and tool timeouts
 - Dangerous tools disabled by default and gated by `confirm: true`
+- Explicit read-only, destructive, idempotent, and open-world policy for all 153 tools
 - JSON Schema validation and structured MCP error results
 - Node.js regression tests for HTTP behavior and key Cocos API contracts
 
@@ -20,8 +21,11 @@ The current implementation provides **157 tools in 14 categories**, uses the off
 
 | Item | Support |
 |---|---|
-| Cocos Creator | 3.8.x |
-| Node.js | The MCP SDK requires Node.js 18+; verify the target Cocos Electron runtime |
+| Cocos Creator | **3.8.8 verified**; other 3.8 patch releases are not claimed |
+| Electron | `31.3.1` bundled with Cocos Creator 3.8.8 |
+| Node.js | `20.15.1` bundled with Cocos Creator 3.8.8 |
+| Chromium | `126.0.6478.185` |
+| MCP SDK | `@modelcontextprotocol/sdk@1.29.x`, initialize/tools-list smoke tested in that runtime |
 | MCP transport | Streamable HTTP |
 | Bind address | `127.0.0.1` |
 
@@ -116,8 +120,8 @@ Qualified MCP names use `<category>_<tool>`, for example `node_create_node`.
 | `scene` | 8 | Scene queries, opening, saving, and hierarchy |
 | `node` | 11 | Node creation, lookup, transforms, movement, and deletion |
 | `component` | 7 | Component queries, mutation, properties, and script attachment |
-| `prefab` | 10 | Prefab lookup, instantiation, creation, update, and restore |
-| `project` | 24 | Project data, asset database, builder UI, and preview server |
+| `prefab` | 8 | Prefab lookup, validation, instantiation, duplication, and restore |
+| `project` | 22 | Project data, asset database, builder UI, and preview server |
 | `debug` | 10 | Logs, node tree, performance, validation, and script execution |
 | `preferences` | 7 | Editor preference queries, mutation, import, and export |
 | `server` | 6 | Cocos editor server and network information |
@@ -127,7 +131,7 @@ Qualified MCP names use `<category>_<tool>`, for example `node_create_node`.
 | `referenceImage` | 12 | Scene reference image management |
 | `assetAdvanced` | 11 | Batch assets, dependencies, compression, and manifests |
 | `validation` | 3 | JSON, string, and MCP request helpers |
-| **Total** | **157** | |
+| **Total** | **153** | |
 
 Use runtime `tools/list` as the authoritative list of currently enabled tools. `/api/tools` exposes the same enabled set when the REST API is enabled.
 
@@ -142,8 +146,10 @@ Settings are stored under `{project}/settings/`:
 |---|---:|---|
 | `port` | `3000` | HTTP listening port |
 | `autoStart` | `false` | Start when the extension loads |
-| `enableDebugLog` | `false` | Enable server debug logs |
-| `maxConnections` | `10` | Maximum MCP sessions and concurrent requests |
+| `enableDebugLog` | `false` | Enable redacted debug logs |
+| `maxConnections` | `10` | Maximum concurrent HTTP requests |
+| `maxSessions` | `10` | Maximum MCP sessions |
+| `sessionIdleTimeoutMs` | `1800000` | Idle session cleanup, 30 minutes by default |
 | `authToken` | Generated | HTTP access token |
 | `allowedOrigins` | `[]` | Browser Origin allowlist |
 | `requestBodyLimitBytes` | `1048576` | Maximum request body, 1 MiB by default |
@@ -179,16 +185,20 @@ Important constraint: `cc.*` APIs can only run in the `scene.ts` scene-script co
 npm run build       # TypeScript -> dist/
 npm run watch       # Watch compilation
 npm test            # Build and run Node.js regression tests
+npm run test:editor # Isolated real-editor smoke; concurrent Cocos instances are rejected by default
 npm audit           # Dependency security audit
 ```
 
 Current tests cover:
 
-- MCP initialization, sessions, authentication, Origin handling, tools, and validation errors
+- MCP initialization, session deletion/expiry/limits, authentication, Origin handling, and validation
+- Body limits, tool timeout, REST gating, CORS preflight, SSE shutdown, and `tools/list_changed`
 - Empty tool configurations and dangerous-tool confirmation
+- Configuration reconciliation/import migration and explicit security policy for all 153 tools
+- MCP initialize/tools-list inside the Cocos 3.8.8 Electron/Node runtime
 - Key Cocos message contracts for components, nodes, prefabs, builder, and scene view
 
-Real Cocos Creator 3.8.x editor integration testing is still required.
+See [docs/editor-smoke.md](docs/editor-smoke.md) for the real-editor harness and expected state transitions.
 
 ## Adding a Tool
 
@@ -201,10 +211,12 @@ Real Cocos Creator 3.8.x editor integration testing is still required.
 
 ## Known Limitations
 
-- `run_project` and `build_project` mainly open the Cocos builder UI; complete builds still require UI interaction.
-- Some advanced prefab paths contain historical compatibility code that needs systematic real-project verification.
+- Cocos 3.8.8 has no stable public message for creating a prefab from a node or applying a node back to a prefab, so those misleading tools are not exposed.
+- `scene_open_scene` and `scene_save_scene` are asynchronous Cocos operations; clients should query scene state afterward.
+- The real-editor smoke blocks concurrent Cocos instances by default. Maintainers may explicitly set `ALLOW_CONCURRENT_COCOS_SMOKE=1`; the fixture isolates its profile, home, caches, and temporary directories.
 - Several tool modules are large and still rely heavily on `any`.
-- Automated tests do not launch Cocos Creator.
+
+Debug logging is off by default. When enabled, tokens, request bodies, scripts, property values, detail objects, and user paths are redacted.
 
 See [TODO.md](TODO.md) for the upgrade roadmap.
 

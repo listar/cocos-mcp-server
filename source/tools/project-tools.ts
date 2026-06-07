@@ -6,41 +6,6 @@ export class ProjectTools implements ToolExecutor {
     getTools(): ToolDefinition[] {
         return [
             {
-                name: 'run_project',
-                description: 'Run the project in preview mode',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        platform: {
-                            type: 'string',
-                            description: 'Target platform',
-                            enum: ['browser', 'simulator', 'preview'],
-                            default: 'browser'
-                        }
-                    }
-                }
-            },
-            {
-                name: 'build_project',
-                description: 'Build the project',
-                inputSchema: {
-                    type: 'object',
-                    properties: {
-                        platform: {
-                            type: 'string',
-                            description: 'Build platform',
-                            enum: ['web-mobile', 'web-desktop', 'ios', 'android', 'windows', 'mac']
-                        },
-                        debug: {
-                            type: 'boolean',
-                            description: 'Debug build',
-                            default: true
-                        }
-                    },
-                    required: ['platform']
-                }
-            },
-            {
                 name: 'get_project_info',
                 description: 'Get project information',
                 inputSchema: {
@@ -393,10 +358,6 @@ export class ProjectTools implements ToolExecutor {
 
     async execute(toolName: string, args: any): Promise<ToolResponse> {
         switch (toolName) {
-            case 'run_project':
-                return await this.runProject(args.platform);
-            case 'build_project':
-                return await this.buildProject(args);
             case 'get_project_info':
                 return await this.getProjectInfo();
             case 'get_project_settings':
@@ -444,52 +405,6 @@ export class ProjectTools implements ToolExecutor {
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
-    }
-
-    private async runProject(platform: string = 'browser'): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            const previewConfig = {
-                platform: platform,
-                scenes: [] // Will use current scene
-            };
-
-            // Note: Preview module is not documented in official API
-            // Using fallback approach - open build panel as alternative
-            (Editor.Message.request as any)('builder', 'open', 'default').then(() => {
-                resolve({
-                    success: true,
-                    message: `Build panel opened. Preview functionality requires manual setup.`
-                });
-            }).catch((err: Error) => {
-                resolve({ success: false, error: err.message });
-            });
-        });
-    }
-
-    private async buildProject(args: any): Promise<ToolResponse> {
-        return new Promise((resolve) => {
-            const buildOptions = {
-                platform: args.platform,
-                debug: args.debug !== false,
-                sourceMaps: args.debug !== false,
-                buildPath: `build/${args.platform}`
-            };
-
-            // Note: Builder module only supports 'open' and 'query-worker-ready'
-            // Building requires manual interaction through the build panel
-            (Editor.Message.request as any)('builder', 'open', 'default').then(() => {
-                resolve({
-                    success: true,
-                    message: `Build panel opened for ${args.platform}. Please configure and start build manually.`,
-                    data: { 
-                        platform: args.platform,
-                        instruction: "Use the build panel to configure and start the build process"
-                    }
-                });
-            }).catch((err: Error) => {
-                resolve({ success: false, error: err.message });
-            });
-        });
     }
 
     private async getProjectInfo(): Promise<ToolResponse> {

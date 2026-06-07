@@ -2,6 +2,7 @@ import { MCPServer } from './mcp-server';
 import { normalizeSettings, readSettings, saveSettings } from './settings';
 import { MCPServerSettings } from './types';
 import { ToolManager } from './tools/tool-manager';
+import { debugLog, errorLog } from './logger';
 
 let mcpServer: MCPServer | null = null;
 let toolManager: ToolManager;
@@ -169,17 +170,16 @@ export const methods: { [key: string]: (...any: any) => any } = {
 };
 
 export function load() {
-    console.log('[MCP] Extension loaded');
-
     toolManager = new ToolManager();
 
     const settings = readSettings();
     mcpServer = new MCPServer(settings);
+    debugLog('MCP', 'Extension loaded');
     mcpServer.updateEnabledTools(toolManager.getEnabledTools());
 
     if (settings.autoStart) {
         mcpServer.start().catch(err => {
-            console.error('[MCP] Auto-start failed:', err);
+            errorLog('MCP', 'Auto-start failed', err);
         });
     }
 }

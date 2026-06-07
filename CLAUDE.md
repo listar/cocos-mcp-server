@@ -4,7 +4,7 @@ Guidance for Claude Code and other coding agents working in this repository.
 
 ## Project
 
-Cocos MCP Server is a Cocos Creator 3.8.x editor extension. It exposes 157 editor tools in 14 categories through MCP Streamable HTTP.
+Cocos MCP Server is a Cocos Creator 3.8.8 editor extension. It exposes 153 editor tools in 14 categories through MCP Streamable HTTP.
 
 The server uses:
 
@@ -21,6 +21,7 @@ npm install          # Install dependencies
 npm run build        # Compile source/ to dist/
 npm run watch        # Watch TypeScript compilation
 npm test             # Build and run node:test regression tests
+npm run test:editor  # Run the standalone Cocos 3.8.8 editor smoke
 npm audit            # Check dependency advisories
 ```
 
@@ -117,12 +118,14 @@ The server uses stateful MCP transports. Initialization returns `MCP-Session-Id`
 - `enableDebugLog`
 - `allowedOrigins`
 - `maxConnections`
+- `maxSessions`
+- `sessionIdleTimeoutMs`
 - `authToken`
 - `requestBodyLimitBytes`
 - `toolExecutionTimeoutMs`
 - `enableRestApi`
 
-`{project}/settings/tool-manager.json` stores named tool configurations and `securityMigrationVersion`.
+`{project}/settings/tool-manager.json` stores named tool configurations, schema versions, and security migration state.
 
 Always pass settings through `normalizeSettings`. Updating settings must preserve stopped/running state and current tool enablement.
 
@@ -142,11 +145,11 @@ For a new category, also register it in both `MCPServer.initializeTools()` and `
 
 - `scene/remove-component` expects a component UUID, not a node UUID plus type.
 - `scene/duplicate-node` can return an array of UUIDs.
-- `scene/restore-prefab` expects `{ uuid: nodeUuid }`.
+- Cocos 3.8.8 Inspector restores prefabs with `restore-prefab(rootUuid, prefabUuid)`, despite the bundled declaration advertising a single options object.
 - `builder/open` requires a panel name such as `'default'`.
 - Cocos message names and return shapes must be checked against 3.8.x types or verified in-editor.
 
-Do not report success for an operation that only scheduled asynchronous work or did not actually mutate the editor.
+For inherently asynchronous editor commands, success must explicitly mean "dispatched", include a warning, and be verified by a later query or editor smoke case.
 
 ## Tests
 
@@ -159,7 +162,7 @@ Current coverage includes:
 - Tool listing, disabled tools, argument validation, and dangerous-tool schemas
 - Component removal, node duplication, prefab restore, builder, server IP, and scene-view message contracts
 
-Tests mock `global.Editor`; they do not replace real Cocos Creator integration testing.
+`npm test` includes the bundled Electron runtime smoke. `npm run test:editor` creates a temporary real project and rejects another Cocos instance by default. Use `ALLOW_CONCURRENT_COCOS_SMOKE=1` only for intentional maintenance verification; the harness isolates its runtime directories. Never terminate a user's active editor to make the smoke run.
 
 ## Generated Output
 

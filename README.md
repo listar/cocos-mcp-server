@@ -2,9 +2,9 @@
 
 [English](README.EN.md) | 中文
 
-面向 Cocos Creator 3.8.x 的编辑器扩展，通过 MCP Streamable HTTP 让 Codex、Claude Code、Cursor 等 AI 客户端操作场景、节点、组件、预制体和项目资源。
+面向 Cocos Creator 3.8.8 的编辑器扩展，通过 MCP Streamable HTTP 让 Codex、Claude Code、Cursor 等 AI 客户端操作场景、节点、组件、预制体和项目资源。
 
-当前版本提供 **14 个工具分类、157 个工具**，使用官方 `@modelcontextprotocol/sdk`，并默认启用本地鉴权和高风险操作保护。
+当前版本提供 **14 个工具分类、153 个工具**，使用官方 `@modelcontextprotocol/sdk`，并默认启用本地鉴权和高风险操作保护。
 
 ## 主要能力
 
@@ -13,6 +13,7 @@
 - Vue 3 控制面板、服务器设置和工具启停管理
 - Bearer Token 鉴权、Origin 白名单、请求大小限制和工具超时
 - 高风险工具默认关闭，执行时必须显式传入 `confirm: true`
+- 153 个工具均有显式只读、破坏性、幂等和外部访问安全分类
 - MCP 参数 JSON Schema 校验和结构化错误返回
 - Node.js 内置测试框架覆盖 HTTP 协议与关键 Cocos API 契约
 
@@ -20,8 +21,11 @@
 
 | 项目 | 支持情况 |
 |---|---|
-| Cocos Creator | 3.8.x |
-| Node.js | MCP SDK 要求 Node.js 18+；仍需在目标 Cocos Electron 运行时验证 |
+| Cocos Creator | **3.8.8（已验证）**；其他 3.8 补丁版本未声明支持 |
+| Electron | `31.3.1`（Cocos Creator 3.8.8 内置） |
+| Node.js | `20.15.1`（Cocos Creator 3.8.8 内置） |
+| Chromium | `126.0.6478.185` |
+| MCP SDK | `@modelcontextprotocol/sdk@1.29.x`，已在上述 Electron 运行时完成 initialize/tools-list 冒烟 |
 | MCP 传输 | Streamable HTTP |
 | 监听地址 | `127.0.0.1` |
 
@@ -115,8 +119,8 @@ MCP 暴露的完整工具名格式为 `<category>_<tool>`，例如 `node_create_
 | `scene` | 8 | 场景查询、打开、保存和层级结构 |
 | `node` | 11 | 节点创建、查找、变换、移动和删除 |
 | `component` | 7 | 组件查询、增删、属性设置和脚本挂载 |
-| `prefab` | 10 | 预制体查询、实例化、创建、更新和还原 |
-| `project` | 24 | 项目信息、资源数据库、构建面板和预览服务 |
+| `prefab` | 8 | 预制体查询、校验、实例化、复制和还原 |
+| `project` | 22 | 项目信息、资源数据库、构建面板和预览服务 |
 | `debug` | 10 | 日志、节点树、性能、场景验证和脚本执行 |
 | `preferences` | 7 | 编辑器偏好设置查询、修改和导入导出 |
 | `server` | 6 | Cocos 编辑器服务器和网络信息 |
@@ -126,7 +130,7 @@ MCP 暴露的完整工具名格式为 `<category>_<tool>`，例如 `node_create_
 | `referenceImage` | 12 | 场景参考图管理 |
 | `assetAdvanced` | 11 | 批量资源、依赖分析、压缩和清单 |
 | `validation` | 3 | JSON、字符串和 MCP 请求格式辅助 |
-| **合计** | **157** | |
+| **合计** | **153** | |
 
 当前启用的工具以运行时 `tools/list` 为准。启用 REST API 后，也可通过 `/api/tools` 查看当前启用工具。
 
@@ -141,8 +145,10 @@ MCP 暴露的完整工具名格式为 `<category>_<tool>`，例如 `node_create_
 |---|---:|---|
 | `port` | `3000` | HTTP 监听端口 |
 | `autoStart` | `false` | 插件加载时自动启动 |
-| `enableDebugLog` | `false` | 输出服务器调试日志 |
-| `maxConnections` | `10` | 最大 MCP 会话及并发请求限制 |
+| `enableDebugLog` | `false` | 输出脱敏后的调试日志 |
+| `maxConnections` | `10` | 最大并发 HTTP 请求数 |
+| `maxSessions` | `10` | 最大 MCP 会话数 |
+| `sessionIdleTimeoutMs` | `1800000` | 空闲会话清理时间，默认 30 分钟 |
 | `authToken` | 自动生成 | HTTP 访问令牌 |
 | `allowedOrigins` | `[]` | 浏览器 Origin 白名单 |
 | `requestBodyLimitBytes` | `1048576` | 最大请求体，默认 1 MiB |
@@ -178,16 +184,20 @@ cc.* Engine APIs
 npm run build       # TypeScript -> dist/
 npm run watch       # 监听编译
 npm test            # 构建并运行 Node.js 回归测试
+npm run test:editor # 创建隔离项目并运行真实编辑器冒烟；默认拒绝与其他 Cocos 实例并行
 npm audit           # 依赖安全审计
 ```
 
 测试覆盖：
 
-- MCP 初始化、会话、鉴权、Origin、工具列表和参数错误
+- MCP 初始化、会话删除/过期/上限、鉴权、Origin、工具列表和参数错误
+- 请求体限制、工具超时、REST 开关、CORS 预检、SSE 关闭和 `tools/list_changed`
 - 空工具配置与危险工具确认参数
-- 组件删除、节点复制、Prefab 还原、Builder、场景视图等关键 Cocos 消息契约
+- 配置补齐/清理/导入迁移与全部 153 个工具的显式安全分类
+- Cocos 3.8.8 内置 Electron/Node 中的 MCP initialize/tools-list
+- 组件删除、节点复制、Prefab 还原、Builder、场景保存与场景视图等关键 Cocos 消息契约
 
-仍需在 Cocos Creator 3.8.x 中进行真实编辑器集成测试。
+真实编辑器脚本、前后状态和运行限制见 [docs/editor-smoke.md](docs/editor-smoke.md)。
 
 ## 新增工具
 
@@ -200,10 +210,12 @@ npm audit           # 依赖安全审计
 
 ## 已知限制
 
-- `run_project` 和 `build_project` 当前主要打开 Cocos 构建面板，完整构建仍需 UI 操作。
-- 部分 Prefab 高级流程包含历史兼容代码，尚需在真实项目中系统验证。
+- Cocos 3.8.8 没有稳定公开的“从节点创建 Prefab”与“回写 Prefab”消息，因此这两个误导性工具不再暴露。
+- `scene_open_scene` 和 `scene_save_scene` 由 Cocos 异步处理；结果表示命令已派发，调用方应随后查询场景状态。
+- 真实编辑器冒烟默认阻止并行 Cocos 实例；维护验证可显式设置 `ALLOW_CONCURRENT_COCOS_SMOKE=1`，测试 runtime 会隔离 profile、HOME、缓存和临时目录。
 - 工具分类文件体积较大，类型中仍有较多 `any`。
-- 当前自动测试不启动 Cocos Creator。
+
+调试日志默认关闭。开启后，令牌、请求体、脚本、属性值、详情对象和用户目录会被脱敏。
 
 后续升级计划见 [TODO.md](TODO.md)。
 

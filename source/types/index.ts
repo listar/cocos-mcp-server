@@ -4,6 +4,8 @@ export interface MCPServerSettings {
     enableDebugLog: boolean;
     allowedOrigins: string[];
     maxConnections: number;
+    maxSessions: number;
+    sessionIdleTimeoutMs: number;
     authToken: string;
     requestBodyLimitBytes: number;
     toolExecutionTimeoutMs: number;
@@ -142,6 +144,7 @@ export interface ToolConfig {
 }
 
 export interface ToolConfiguration {
+    schemaVersion: number;
     id: string;
     name: string;
     description?: string;
@@ -155,6 +158,7 @@ export interface ToolManagerSettings {
     currentConfigId: string;
     maxConfigSlots: number;
     securityMigrationVersion: number;
+    configurationSchemaVersion: number;
 }
 
 export interface ToolManagerState {

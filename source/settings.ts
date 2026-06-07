@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { MCPServerSettings, ToolManagerSettings, ToolConfiguration } from './types';
+import { errorLog } from './logger';
 
 export const DEFAULT_SETTINGS: MCPServerSettings = {
     port: 3000,
@@ -9,6 +10,8 @@ export const DEFAULT_SETTINGS: MCPServerSettings = {
     enableDebugLog: false,
     allowedOrigins: [],
     maxConnections: 10,
+    maxSessions: 10,
+    sessionIdleTimeoutMs: 30 * 60 * 1000,
     authToken: '',
     requestBodyLimitBytes: 1024 * 1024,
     toolExecutionTimeoutMs: 30000,
@@ -19,7 +22,8 @@ export const DEFAULT_TOOL_MANAGER_SETTINGS: ToolManagerSettings = {
     configurations: [],
     currentConfigId: '',
     maxConfigSlots: 5,
-    securityMigrationVersion: 0
+    securityMigrationVersion: 0,
+    configurationSchemaVersion: 0
 };
 
 function clampInteger(value: unknown, fallback: number, min: number, max: number): number {
@@ -46,6 +50,13 @@ export function normalizeSettings(
         enableDebugLog: Boolean(merged.enableDebugLog),
         allowedOrigins: Array.from(new Set(allowedOrigins)),
         maxConnections: clampInteger(merged.maxConnections, DEFAULT_SETTINGS.maxConnections, 1, 100),
+        maxSessions: clampInteger(merged.maxSessions, DEFAULT_SETTINGS.maxSessions, 1, 100),
+        sessionIdleTimeoutMs: clampInteger(
+            merged.sessionIdleTimeoutMs,
+            DEFAULT_SETTINGS.sessionIdleTimeoutMs,
+            1000,
+            24 * 60 * 60 * 1000
+        ),
         authToken: typeof merged.authToken === 'string' && merged.authToken.trim().length >= 16
             ? merged.authToken.trim()
             : randomBytes(24).toString('hex'),
@@ -100,7 +111,7 @@ export function readSettings(): MCPServerSettings {
         }
         return settings;
     } catch (e) {
-        console.error('[Settings] Failed to read server settings:', e);
+        errorLog('Settings', 'Failed to read server settings', e);
     }
     return normalizeSettings({});
 }
@@ -111,7 +122,7 @@ export function saveSettings(settings: MCPServerSettings): void {
         const normalized = normalizeSettings(settings);
         fs.writeFileSync(getSettingsPath(), JSON.stringify(normalized, null, 2));
     } catch (e) {
-        console.error('[Settings] Failed to save server settings:', e);
+        errorLog('Settings', 'Failed to save server settings', e);
         throw e;
     }
 }
@@ -122,10 +133,25 @@ export function readToolManagerSettings(): ToolManagerSettings {
         const filePath = getToolManagerSettingsPath();
         if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, 'utf8');
-            return { ...DEFAULT_TOOL_MANAGER_SETTINGS, ...JSON.parse(content) };
+            const parsed = JSON.parse(content);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                throw new Error('Tool manager settings must be an object');
+            }
+            return {
+                configurations: Array.isArray(parsed.configurations) ? parsed.configurations : [],
+                currentConfigId: typeof parsed.currentConfigId === 'string' ? parsed.currentConfigId : '',
+                maxConfigSlots: clampInteger(
+                    parsed.maxConfigSlots,
+                    DEFAULT_TOOL_MANAGER_SETTINGS.maxConfigSlots,
+                    1,
+                    20
+                ),
+                securityMigrationVersion: clampInteger(parsed.securityMigrationVersion, 0, 0, 1000),
+                configurationSchemaVersion: clampInteger(parsed.configurationSchemaVersion, 0, 0, 1000)
+            };
         }
     } catch (e) {
-        console.error('[Settings] Failed to read tool manager settings:', e);
+        errorLog('Settings', 'Failed to read tool manager settings', e);
     }
     return { ...DEFAULT_TOOL_MANAGER_SETTINGS };
 }
@@ -135,7 +161,7 @@ export function saveToolManagerSettings(settings: ToolManagerSettings): void {
         ensureSettingsDir();
         fs.writeFileSync(getToolManagerSettingsPath(), JSON.stringify(settings, null, 2));
     } catch (e) {
-        console.error('[Settings] Failed to save tool manager settings:', e);
+        errorLog('Settings', 'Failed to save tool manager settings', e);
         throw e;
     }
 }
@@ -145,14 +171,28 @@ export function exportToolConfiguration(config: ToolConfiguration): string {
 }
 
 export function importToolConfiguration(configJson: string): ToolConfiguration {
-    let config: any;
+    let config: unknown;
     try {
         config = JSON.parse(configJson);
     } catch (e) {
         throw new Error('Invalid JSON format');
     }
-    if (!config.id || !config.name || !Array.isArray(config.tools)) {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        throw new Error('Invalid configuration structure: expected an object');
+    }
+    const candidate = config as Record<string, unknown>;
+    if (
+        typeof candidate.id !== 'string'
+        || typeof candidate.name !== 'string'
+        || !Array.isArray(candidate.tools)
+    ) {
         throw new Error('Invalid configuration structure: missing required fields (id, name, tools)');
+    }
+    if (
+        candidate.description !== undefined
+        && typeof candidate.description !== 'string'
+    ) {
+        throw new Error('Invalid configuration structure: description must be a string');
     }
     return config as ToolConfiguration;
 }

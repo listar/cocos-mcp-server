@@ -1,4 +1,5 @@
 import { ToolDefinition, ToolResponse, ToolExecutor, NodeInfo } from '../types';
+import { debugLog } from '../logger';
 import { ComponentTools } from './component-tools';
 
 export class NodeTools implements ToolExecutor {
@@ -243,18 +244,13 @@ export class NodeTools implements ToolExecutor {
             },
             {
                 name: 'duplicate_node',
-                description: 'Duplicate a node',
+                description: 'Duplicate a node and its hierarchy',
                 inputSchema: {
                     type: 'object',
                     properties: {
                         uuid: {
                             type: 'string',
                             description: 'Node UUID to duplicate'
-                        },
-                        includeChildren: {
-                            type: 'boolean',
-                            description: 'Include children nodes',
-                            default: true
                         }
                     },
                     required: ['uuid']
@@ -298,7 +294,7 @@ export class NodeTools implements ToolExecutor {
             case 'move_node':
                 return await this.moveNode(args.nodeUuid, args.newParentUuid, args.siblingIndex);
             case 'duplicate_node':
-                return await this.duplicateNode(args.uuid, args.includeChildren);
+                return await this.duplicateNode(args.uuid);
             case 'detect_node_type':
                 return await this.detectNodeType(args.uuid);
             default:
@@ -317,10 +313,10 @@ export class NodeTools implements ToolExecutor {
                         const sceneInfo = await Editor.Message.request('scene', 'query-node-tree');
                         if (sceneInfo && typeof sceneInfo === 'object' && !Array.isArray(sceneInfo) && Object.prototype.hasOwnProperty.call(sceneInfo, 'uuid')) {
                             targetParentUuid = (sceneInfo as any).uuid;
-                            console.log(`No parent specified, using scene root: ${targetParentUuid}`);
+                            debugLog('NodeTools', `No parent specified, using scene root: ${targetParentUuid}`);
                         } else if (Array.isArray(sceneInfo) && sceneInfo.length > 0 && sceneInfo[0].uuid) {
                             targetParentUuid = sceneInfo[0].uuid;
-                            console.log(`No parent specified, using scene root: ${targetParentUuid}`);
+                            debugLog('NodeTools', `No parent specified, using scene root: ${targetParentUuid}`);
                         } else {
                             const currentScene = await Editor.Message.request('scene', 'query-current-scene');
                             if (currentScene && currentScene.uuid) {
@@ -328,7 +324,7 @@ export class NodeTools implements ToolExecutor {
                             }
                         }
                     } catch (err) {
-                        console.warn('Failed to get scene root, will use default behavior');
+                        debugLog('NodeTools', 'Failed to get scene root, will use default behavior');
                     }
                 }
 
@@ -339,7 +335,7 @@ export class NodeTools implements ToolExecutor {
                         const assetInfo = await Editor.Message.request('asset-db', 'query-asset-info', args.assetPath);
                         if (assetInfo && assetInfo.uuid) {
                             finalAssetUuid = assetInfo.uuid;
-                            console.log(`Asset path '${args.assetPath}' resolved to UUID: ${finalAssetUuid}`);
+                            debugLog('NodeTools', `Asset path '${args.assetPath}' resolved to UUID: ${finalAssetUuid}`);
                         } else {
                             resolve({
                                 success: false,
@@ -389,7 +385,7 @@ export class NodeTools implements ToolExecutor {
 
                 // Apply initial transform after creation via set_node_transform
 
-                console.log('Creating node with options:', createNodeOptions);
+                debugLog('NodeTools', 'Creating node with options:', createNodeOptions);
 
                 // Create the node
                 const nodeUuid = await Editor.Message.request('scene', 'create-node', createNodeOptions);
@@ -405,7 +401,7 @@ export class NodeTools implements ToolExecutor {
                             keepWorldTransform: args.keepWorldTransform || false
                         });
                     } catch (err) {
-                        console.warn('Failed to set sibling index:', err);
+                        debugLog('NodeTools', 'Failed to set sibling index:', err);
                     }
                 }
 
@@ -420,16 +416,16 @@ export class NodeTools implements ToolExecutor {
                                     componentType: componentType
                                 });
                                 if (result.success) {
-                                    console.log(`Component ${componentType} added successfully`);
+                                    debugLog('NodeTools', `Component ${componentType} added successfully`);
                                 } else {
-                                    console.warn(`Failed to add component ${componentType}:`, result.error);
+                                    debugLog('NodeTools', `Failed to add component ${componentType}:`, result.error);
                                 }
                             } catch (err) {
-                                console.warn(`Failed to add component ${componentType}:`, err);
+                                debugLog('NodeTools', `Failed to add component ${componentType}:`, err);
                             }
                         }
                     } catch (err) {
-                        console.warn('Failed to add components:', err);
+                        debugLog('NodeTools', 'Failed to add components:', err);
                     }
                 }
 
@@ -443,9 +439,9 @@ export class NodeTools implements ToolExecutor {
                             rotation: args.initialTransform.rotation,
                             scale: args.initialTransform.scale
                         });
-                        console.log('Initial transform applied successfully');
+                        debugLog('NodeTools', 'Initial transform applied successfully');
                     } catch (err) {
-                        console.warn('Failed to set initial transform:', err);
+                        debugLog('NodeTools', 'Failed to set initial transform:', err);
                     }
                 }
 
@@ -467,7 +463,7 @@ export class NodeTools implements ToolExecutor {
                         };
                     }
                 } catch (err) {
-                    console.warn('Failed to get verification data:', err);
+                    debugLog('NodeTools', 'Failed to get verification data:', err);
                 }
 
                 const successMessage = finalAssetUuid 
@@ -986,9 +982,8 @@ export class NodeTools implements ToolExecutor {
         });
     }
 
-    private async duplicateNode(uuid: string, includeChildren: boolean = true): Promise<ToolResponse> {
+    private async duplicateNode(uuid: string): Promise<ToolResponse> {
         return new Promise((resolve) => {
-            // Note: includeChildren parameter is accepted for future use but not currently implemented
             Editor.Message.request('scene', 'duplicate-node', uuid).then((result: string | string[]) => {
                 const newUuids = Array.isArray(result) ? result : [result];
                 resolve({
@@ -996,8 +991,9 @@ export class NodeTools implements ToolExecutor {
                     data: {
                         newUuid: newUuids[0],
                         newUuids,
-                        message: 'Node duplicated successfully'
-                    }
+                        message: 'Node hierarchy duplicated successfully'
+                    },
+                    verificationData: { sourceUuid: uuid, duplicatedUuids: newUuids }
                 });
             }).catch((err: Error) => {
                 resolve({ success: false, error: err.message });
