@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { ToolConfig, ToolConfiguration, ToolManagerSettings } from '../types';
 import { readToolManagerSettings, saveToolManagerSettings, exportToolConfiguration, importToolConfiguration } from '../settings';
 import { SceneTools } from './scene-tools';
@@ -15,6 +15,7 @@ import { SceneViewTools } from './scene-view-tools';
 import { ReferenceImageTools } from './reference-image-tools';
 import { AssetAdvancedTools } from './asset-advanced-tools';
 import { ValidationTools } from './validation-tools';
+import { isDangerousByDefault } from './tool-security';
 
 // All tool category instances are shared with MCPServer to avoid double instantiation.
 // The same instances are reused here for tool discovery.
@@ -46,7 +47,10 @@ export class ToolManager {
         this.availableTools = this.discoverTools();
 
         if (this.settings.configurations.length === 0) {
+            this.settings.securityMigrationVersion = 1;
             this.createConfiguration('Default', 'Auto-created default tool configuration');
+        } else {
+            this.applySecurityMigration();
         }
     }
 
@@ -59,7 +63,7 @@ export class ToolManager {
                     tools.push({
                         category,
                         name: tool.name,
-                        enabled: true,
+                        enabled: !isDangerousByDefault(`${category}_${tool.name}`),
                         description: tool.description
                     });
                 }
@@ -92,7 +96,7 @@ export class ToolManager {
 
         const now = new Date().toISOString();
         const config: ToolConfiguration = {
-            id: uuidv4(),
+            id: randomUUID(),
             name,
             description,
             tools: this.availableTools.map(tool => ({ ...tool })),
@@ -164,7 +168,7 @@ export class ToolManager {
 
     public importConfiguration(configJson: string): ToolConfiguration {
         const config = importToolConfiguration(configJson);
-        config.id = uuidv4();
+        config.id = randomUUID();
         const now = new Date().toISOString();
         config.createdAt = now;
         config.updatedAt = now;
@@ -208,5 +212,21 @@ export class ToolManager {
 
     private saveSettings(): void {
         saveToolManagerSettings(this.settings);
+    }
+
+    private applySecurityMigration(): void {
+        if (this.settings.securityMigrationVersion >= 1) return;
+
+        for (const config of this.settings.configurations) {
+            for (const tool of config.tools) {
+                if (isDangerousByDefault(`${tool.category}_${tool.name}`)) {
+                    tool.enabled = false;
+                }
+            }
+            config.updatedAt = new Date().toISOString();
+        }
+
+        this.settings.securityMigrationVersion = 1;
+        this.saveSettings();
     }
 }

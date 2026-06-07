@@ -174,10 +174,10 @@ export class PrefabTools implements ToolExecutor {
                         },
                         assetUuid: {
                             type: 'string',
-                            description: 'Prefab asset UUID'
+                            description: 'Deprecated; Cocos restores the prefab link associated with the node'
                         }
                     },
-                    required: ['nodeUuid', 'assetUuid']
+                    required: ['nodeUuid']
                 }
             }
         ];
@@ -204,7 +204,7 @@ export class PrefabTools implements ToolExecutor {
             case 'duplicate_prefab':
                 return await this.duplicatePrefab(args);
             case 'restore_prefab_node':
-                return await this.restorePrefabNode(args.nodeUuid, args.assetUuid);
+                return await this.restorePrefabNode(args.nodeUuid);
             default:
                 throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -2356,15 +2356,14 @@ export class PrefabTools implements ToolExecutor {
         });
     }
 
-    private async restorePrefabNode(nodeUuid: string, assetUuid: string): Promise<ToolResponse> {
+    private async restorePrefabNode(nodeUuid: string): Promise<ToolResponse> {
         return new Promise((resolve) => {
             // Use official restore-prefab API to restore prefab node
-            (Editor.Message.request as any)('scene', 'restore-prefab', nodeUuid, assetUuid).then(() => {
+            Editor.Message.request('scene', 'restore-prefab', { uuid: nodeUuid }).then(() => {
                 resolve({
                     success: true,
                     data: {
                         nodeUuid: nodeUuid,
-                        assetUuid: assetUuid,
                         message: 'Prefab node restored successfully'
                     }
                 });

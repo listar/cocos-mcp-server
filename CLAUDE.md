@@ -1,52 +1,72 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code and other coding agents working in this repository.
 
-## Project Overview
+## Project
 
-CocosMCPPlugin is a Cocos Creator 3.8.x editor extension that implements an MCP (Model Context Protocol) server, allowing AI assistants (Claude, Cursor, etc.) to control the Cocos Creator editor via JSON-RPC 2.0 over HTTP.
+Cocos MCP Server is a Cocos Creator 3.8.x editor extension. It exposes 157 editor tools in 14 categories through MCP Streamable HTTP.
 
-## Build Commands
+The server uses:
+
+- `@modelcontextprotocol/sdk` for MCP lifecycle and transport behavior
+- Node.js `http` for the loopback HTTP server
+- `Editor.Message` for Cocos Creator IPC
+- `source/scene.ts` for direct `cc.*` engine access
+- Vue 3 for the editor control panel
+
+## Commands
 
 ```bash
 npm install          # Install dependencies
-npm run build        # Compile TypeScript → dist/
-npm run watch        # Watch mode (auto-recompile on changes)
+npm run build        # Compile source/ to dist/
+npm run watch        # Watch TypeScript compilation
+npm test             # Build and run node:test regression tests
+npm audit            # Check dependency advisories
 ```
 
-There is no test framework. Manual testing is done by installing the extension in Cocos Creator and connecting to `http://127.0.0.1:3000/mcp`. The `GET /api/tools` endpoint lists all available tools with curl examples.
+Run `npm test` after code changes. Real editor behavior must also be verified in Cocos Creator when a change touches Cocos IPC or `cc.*`.
 
-## Architecture
+## Execution Contexts
 
-The system has four distinct execution contexts that communicate via Cocos Creator's IPC:
-
+```text
+AI Client
+    |
+    | MCP Streamable HTTP
+    v
+MCPServer (source/mcp-server.ts)
+    |
+    | Editor.Message
+    v
+Extension Main Process (source/main.ts)
+    |
+    | execute-scene-script
+    v
+Scene Script (source/scene.ts)
+    |
+    v
+cc.* APIs
 ```
-AI Client (HTTP JSON-RPC 2.0)
-    ↓ POST /mcp
-MCPServer (mcp-server.ts)          ← runs in extension process
-    ↓ Editor.Message IPC
-main.ts (extension main process)   ← handles lifecycle & settings
-    ↓ execute-scene-script
-scene.ts (scene script context)    ← direct access to cc.* engine APIs
-```
 
-**Key constraint:** Engine APIs (`cc.*`) can only be called from `scene.ts` (the scene script context). Everything else runs in the extension process. Tools that need engine access must route through `Editor.Message` → `execute-scene-script`.
+Hard rule: do not call `cc.*` from the extension process. Add engine operations to `source/scene.ts` and invoke them through `Editor.Message.request('scene', 'execute-scene-script', ...)`.
 
 ## Key Files
 
-| File | Role |
-|------|------|
-| `source/main.ts` | Extension entry: `load`/`unload` lifecycle, message handler registration |
-| `source/mcp-server.ts` | HTTP server, JSON-RPC 2.0 protocol, tool routing (~1200 lines) |
-| `source/scene.ts` | Scene script: engine API calls, node/component manipulation |
-| `source/settings.ts` | JSON settings persistence to `{project}/settings/` |
-| `source/types/index.ts` | Shared TypeScript interfaces (`ToolDefinition`, `ToolResponse`, `ToolExecutor`) |
-| `source/tools/tool-manager.ts` | Per-tool enable/disable configuration |
-| `source/panels/default/index.ts` | Vue 3 control panel UI |
+| File | Responsibility |
+|---|---|
+| `source/main.ts` | Extension lifecycle, IPC methods, server recreation |
+| `source/mcp-server.ts` | HTTP security, MCP sessions, schemas, routing, timeouts |
+| `source/scene.ts` | Scene-script methods with direct engine access |
+| `source/settings.ts` | Server and tool-manager persistence/migration |
+| `source/tools/tool-manager.ts` | Tool discovery, configurations, enablement |
+| `source/tools/tool-security.ts` | Dangerous-tool defaults, confirmation, annotations |
+| `source/tools/*.ts` | The 14 tool executors |
+| `source/panels/default/index.ts` | Vue control panel |
+| `test/*.test.js` | HTTP and Cocos message contract tests |
+| `TODO.md` | Prioritized upgrade roadmap |
 
-## Tool System
+## Tool Model
 
-All tool categories implement the `ToolExecutor` interface:
+Every category implements:
 
 ```typescript
 interface ToolExecutor {
@@ -55,31 +75,94 @@ interface ToolExecutor {
 }
 ```
 
-The 14 tool categories in `source/tools/` are instantiated once in the `MCPServer` constructor and registered by calling `getTools()` on each. When `tools/call` arrives, `MCPServer.executeToolCall()` routes to the appropriate category's `execute()` method.
+`MCPServer` registers each local name as `<category>_<tool>`. For example, `create_node` in the `node` executor becomes `node_create_node`.
 
-**Tool categories:** `scene-tools`, `node-tools`, `component-tools`, `prefab-tools`, `project-tools`, `debug-tools`, `preferences-tools`, `server-tools`, `broadcast-tools`, `scene-advanced-tools`, `scene-view-tools`, `reference-image-tools`, `asset-advanced-tools`, `validation-tools`.
+Categories:
 
-## HTTP Endpoints
+`scene`, `node`, `component`, `prefab`, `project`, `debug`, `preferences`, `server`, `broadcast`, `sceneAdvanced`, `sceneView`, `referenceImage`, `assetAdvanced`, `validation`.
 
-- `POST /mcp` — MCP JSON-RPC 2.0 (primary interface)
-- `GET /health` — Health check
-- `POST /api/{category}/{tool}` — Simplified REST API
-- `GET /api/tools` — List all tools with curl examples
+## Security Invariants
+
+Do not weaken these without an explicit product decision:
+
+- Bind only to `127.0.0.1`.
+- Require authentication everywhere except `GET /health`.
+- Reject browser Origins unless explicitly allowed.
+- Keep REST endpoints disabled by default.
+- Treat an empty enabled-tool configuration as zero exposed tools.
+- Validate tool arguments before execution.
+- Return failed tool results with MCP `isError: true`.
+- Apply request-size, connection, session, and execution-time limits.
+- Keep destructive and arbitrary-execution tools disabled by default.
+- Require `confirm: true` for tools classified by `tool-security.ts`.
+
+Never log or document a real project `authToken`.
+
+## HTTP Behavior
+
+- `POST /mcp`: initialize, notifications, and MCP requests
+- `GET /mcp`: session SSE stream when supported
+- `DELETE /mcp`: close a session
+- `GET /health`: unauthenticated health check
+- `/api/*`: authenticated and available only when `enableRestApi` is true
+
+The server uses stateful MCP transports. Initialization returns `MCP-Session-Id`; subsequent requests must use that session and include `MCP-Protocol-Version`.
 
 ## Settings
 
-Stored as JSON in `{project}/settings/`:
-- `mcp-server.json` — port (default: 3000), autoStart, enableDebugLog, maxConnections, allowedOrigins
-- `tool-manager.json` — named configurations with per-tool enable/disable toggles
+`{project}/settings/mcp-server.json` contains:
 
-## TypeScript Configuration
+- `port`
+- `autoStart`
+- `enableDebugLog`
+- `allowedOrigins`
+- `maxConnections`
+- `authToken`
+- `requestBodyLimitBytes`
+- `toolExecutionTimeoutMs`
+- `enableRestApi`
 
-`base.tsconfig.json` uses `strict: true`, `target: ES2017`, `module: CommonJS`. The compiled output goes to `dist/`. The extension runs on Node.js inside Cocos Creator's Electron environment.
+`{project}/settings/tool-manager.json` stores named tool configurations and `securityMigrationVersion`.
 
-## Adding a New Tool
+Always pass settings through `normalizeSettings`. Updating settings must preserve stopped/running state and current tool enablement.
 
-1. Add the tool definition to an existing category file's `getTools()` return array, or create a new `ToolExecutor` class.
-2. Add the `execute()` case for the tool name.
-3. If the tool needs engine access, add a message handler in `main.ts` and a corresponding function in `scene.ts`.
-4. Register a new category class in the `MCPServer` constructor (if creating a new category).
-5. Add the tool to `package.json` under `contributions.messages` if it needs IPC.
+## Adding or Changing Tools
+
+1. Add the definition and executor branch.
+2. Use a precise JSON Schema, including required fields and bounds.
+3. Route engine access through `scene.ts`.
+4. Register new scene methods in `package.json` under `contributions.scene.methods`.
+5. Classify destructive/open-world behavior in `tool-security.ts`.
+6. Add or update a contract test.
+7. Run `npm test`.
+
+For a new category, also register it in both `MCPServer.initializeTools()` and `ToolManager` discovery.
+
+## Cocos Contract Notes
+
+- `scene/remove-component` expects a component UUID, not a node UUID plus type.
+- `scene/duplicate-node` can return an array of UUIDs.
+- `scene/restore-prefab` expects `{ uuid: nodeUuid }`.
+- `builder/open` requires a panel name such as `'default'`.
+- Cocos message names and return shapes must be checked against 3.8.x types or verified in-editor.
+
+Do not report success for an operation that only scheduled asynchronous work or did not actually mutate the editor.
+
+## Tests
+
+Tests use Node's built-in `node:test` runner after compiling TypeScript.
+
+Current coverage includes:
+
+- Authentication and Origin checks
+- MCP initialization and session routing
+- Tool listing, disabled tools, argument validation, and dangerous-tool schemas
+- Component removal, node duplication, prefab restore, builder, server IP, and scene-view message contracts
+
+Tests mock `global.Editor`; they do not replace real Cocos Creator integration testing.
+
+## Generated Output
+
+`dist/` is generated by `npm run build`. Do not manually edit generated JavaScript.
+
+The current release packaging story is incomplete: `npm pack --dry-run` does not include `dist/`. Treat release packaging as an open task in `TODO.md`.

@@ -18,6 +18,11 @@ interface ServerSettings {
     autoStart: boolean;
     debugLog: boolean;
     maxConnections: number;
+    authToken: string;
+    allowedOrigins: string;
+    requestBodyLimitBytes: number;
+    toolExecutionTimeoutMs: number;
+    enableRestApi: boolean;
 }
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
@@ -68,7 +73,12 @@ module.exports = Editor.Panel.define({
                     port: 3000,
                     autoStart: false,
                     debugLog: false,
-                    maxConnections: 10
+                    maxConnections: 10,
+                    authToken: '',
+                    allowedOrigins: '',
+                    requestBodyLimitBytes: 1024 * 1024,
+                    toolExecutionTimeoutMs: 30000,
+                    enableRestApi: false
                 });
 
                 const availableTools = ref<ToolConfig[]>([]);
@@ -99,7 +109,12 @@ module.exports = Editor.Panel.define({
                                 port: settings.value.port,
                                 autoStart: settings.value.autoStart,
                                 enableDebugLog: settings.value.debugLog,
-                                maxConnections: settings.value.maxConnections
+                                maxConnections: settings.value.maxConnections,
+                                authToken: settings.value.authToken,
+                                allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
+                                requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
+                                toolExecutionTimeoutMs: settings.value.toolExecutionTimeoutMs,
+                                enableRestApi: settings.value.enableRestApi
                             };
                             await Editor.Message.request('cocos-mcp-server', 'update-settings', currentSettings);
                             await Editor.Message.request('cocos-mcp-server', 'start-server');
@@ -115,7 +130,12 @@ module.exports = Editor.Panel.define({
                             port: settings.value.port,
                             autoStart: settings.value.autoStart,
                             enableDebugLog: settings.value.debugLog,
-                            maxConnections: settings.value.maxConnections
+                            maxConnections: settings.value.maxConnections,
+                            authToken: settings.value.authToken,
+                            allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
+                            requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
+                            toolExecutionTimeoutMs: settings.value.toolExecutionTimeoutMs,
+                            enableRestApi: settings.value.enableRestApi
                         };
                         await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
                         settingsChanged.value = false;
@@ -130,6 +150,21 @@ module.exports = Editor.Panel.define({
                     } catch (error) {
                         console.error('[MCP Panel] Failed to copy URL:', error);
                     }
+                };
+
+                const copyToken = async () => {
+                    try {
+                        await navigator.clipboard.writeText(settings.value.authToken);
+                    } catch (error) {
+                        console.error('[MCP Panel] Failed to copy auth token:', error);
+                    }
+                };
+
+                const parseAllowedOrigins = (value: string): string[] => {
+                    return value
+                        .split(',')
+                        .map(origin => origin.trim())
+                        .filter(Boolean);
                 };
 
                 const loadToolManagerState = async () => {
@@ -219,8 +254,14 @@ module.exports = Editor.Panel.define({
                                 port: status.settings.port ?? 3000,
                                 autoStart: status.settings.autoStart ?? false,
                                 debugLog: status.settings.enableDebugLog ?? false,
-                                maxConnections: status.settings.maxConnections ?? 10
+                                maxConnections: status.settings.maxConnections ?? 10,
+                                authToken: status.settings.authToken ?? '',
+                                allowedOrigins: (status.settings.allowedOrigins ?? []).join(', '),
+                                requestBodyLimitBytes: status.settings.requestBodyLimitBytes ?? 1024 * 1024,
+                                toolExecutionTimeoutMs: status.settings.toolExecutionTimeoutMs ?? 30000,
+                                enableRestApi: status.settings.enableRestApi ?? false
                             };
+                            settingsChanged.value = false;
                         }
                     } catch (error) {
                         console.error('[MCP Panel] Failed to load server settings:', error);
@@ -233,7 +274,7 @@ module.exports = Editor.Panel.define({
                                 serverRunning.value = result.running;
                                 serverStatusText.value = result.running ? 'Running' : 'Stopped';
                                 connectedClients.value = result.clients ?? 0;
-                                httpUrl.value = result.running ? `http://localhost:${result.port}` : '';
+                                httpUrl.value = result.running ? `http://127.0.0.1:${result.port}/mcp` : '';
                                 isProcessing.value = false;
                             }
                         } catch (error) {
@@ -261,6 +302,7 @@ module.exports = Editor.Panel.define({
                     toggleServer,
                     saveSettings,
                     copyUrl,
+                    copyToken,
                     loadToolManagerState,
                     updateToolStatus,
                     selectAllTools,

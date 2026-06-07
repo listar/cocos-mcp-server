@@ -202,7 +202,7 @@ export class ValidationTools implements ToolExecutor {
             .replace(/\r/g, '\\r')   // Escape carriage returns
             .replace(/\t/g, '\\t')   // Escape tabs
             .replace(/\f/g, '\\f')   // Escape form feeds
-            .replace(/\b/g, '\\b');  // Escape backspaces
+            .replace(/\x08/g, '\\b'); // Escape backspaces
     }
 
     private validateAgainstSchema(data: any, schema: any): { valid: boolean; errors: string[]; suggestions: string[] } {

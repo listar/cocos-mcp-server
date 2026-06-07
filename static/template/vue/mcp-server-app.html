@@ -51,6 +51,30 @@
                 <ui-num-input slot="content" v-model="settings.maxConnections" :min="1" :max="100" :step="1">
                 </ui-num-input>
             </ui-prop>
+            <ui-prop>
+                <ui-label slot="label">执行超时（毫秒）</ui-label>
+                <ui-num-input slot="content" v-model="settings.toolExecutionTimeoutMs" :min="1000" :max="300000" :step="1000">
+                </ui-num-input>
+            </ui-prop>
+            <ui-prop>
+                <ui-label slot="label">请求上限（字节）</ui-label>
+                <ui-num-input slot="content" v-model="settings.requestBodyLimitBytes" :min="16384" :max="16777216" :step="16384">
+                </ui-num-input>
+            </ui-prop>
+            <ui-prop>
+                <ui-label slot="label">允许的网页来源</ui-label>
+                <ui-input slot="content" v-model="settings.allowedOrigins" placeholder="逗号分隔；留空表示禁止浏览器跨域"></ui-input>
+            </ui-prop>
+            <ui-prop>
+                <ui-label slot="label">启用 REST API</ui-label>
+                <ui-checkbox slot="content" v-model="settings.enableRestApi"></ui-checkbox>
+            </ui-prop>
+            <ui-prop>
+                <ui-label slot="label">访问令牌</ui-label>
+                <ui-input slot="content" :value="settings.authToken" readonly>
+                    <ui-button slot="suffix" @click="copyToken">复制</ui-button>
+                </ui-input>
+            </ui-prop>
         </section>
 
         <section class="server-info" v-if="serverRunning">
@@ -123,4 +147,3 @@
     </div>
 </div>
 
- 

@@ -169,10 +169,10 @@ export class SceneAdvancedTools implements ToolExecutor {
                         },
                         assetUuid: {
                             type: 'string',
-                            description: 'Prefab asset UUID'
+                            description: 'Deprecated; Cocos restores the prefab link associated with the node'
                         }
                     },
-                    required: ['nodeUuid', 'assetUuid']
+                    required: ['nodeUuid']
                 }
             },
             {
@@ -374,7 +374,7 @@ export class SceneAdvancedTools implements ToolExecutor {
             case 'reset_component':
                 return await this.resetComponent(args.uuid);
             case 'restore_prefab':
-                return await this.restorePrefab(args.nodeUuid, args.assetUuid);
+                return await this.restorePrefab(args.nodeUuid);
             case 'execute_component_method':
                 return await this.executeComponentMethod(args.uuid, args.name, args.args);
             case 'execute_scene_script':
@@ -538,9 +538,9 @@ export class SceneAdvancedTools implements ToolExecutor {
         });
     }
 
-    private async restorePrefab(nodeUuid: string, assetUuid: string): Promise<ToolResponse> {
+    private async restorePrefab(nodeUuid: string): Promise<ToolResponse> {
         return new Promise((resolve) => {
-            (Editor.Message.request as any)('scene', 'restore-prefab', nodeUuid, assetUuid).then(() => {
+            Editor.Message.request('scene', 'restore-prefab', { uuid: nodeUuid }).then(() => {
                 resolve({
                     success: true,
                     message: 'Prefab restored successfully'

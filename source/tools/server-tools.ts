@@ -68,7 +68,10 @@ export class ServerTools implements ToolExecutor {
 
     private async querySortedServerIPList(): Promise<ToolResponse> {
         try {
-            const sortedIPList: string[] = await Editor.Message.request('server', 'query-sort-ip-list');
+            const ipList: string[] = await Editor.Message.request('server', 'query-ip-list');
+            const sortedIPList = [...ipList].sort((left, right) => left.localeCompare(right, undefined, {
+                numeric: true
+            }));
             return { success: true, data: { sortedIPList, count: sortedIPList.length } };
         } catch (err: any) {
             return { success: false, error: err.message };

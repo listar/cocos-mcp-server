@@ -1,350 +1,234 @@
 # Cocos MCP Server
 
-适用于 Cocos Creator 3.8.x 的 AI MCP (Model Context Protocol) 服务器插件，让 AI 助手（Claude、Cursor 等）能够直接控制 Cocos Creator 编辑器。
+[English](README.EN.md) | 中文
 
-An AI MCP (Model Context Protocol) server plugin for Cocos Creator 3.8.x, enabling AI assistants (Claude, Cursor, etc.) to directly control the Cocos Creator editor.
+面向 Cocos Creator 3.8.x 的编辑器扩展，通过 MCP Streamable HTTP 让 Codex、Claude Code、Cursor 等 AI 客户端操作场景、节点、组件、预制体和项目资源。
 
----
+当前版本提供 **14 个工具分类、157 个工具**，使用官方 `@modelcontextprotocol/sdk`，并默认启用本地鉴权和高风险操作保护。
 
-## 功能特性 / Features
+## 主要能力
 
-- **MCP 协议 / MCP Protocol**：基于 JSON-RPC 2.0 的标准 MCP 协议，通过 HTTP 传输 / Standard JSON-RPC 2.0 over HTTP transport
-- **130+ 工具 / 130+ Tools**：覆盖场景、节点、组件、预制体、资源、项目等全方位编辑器操作 / Full coverage of scene, node, component, prefab, asset, and project operations
-- **Vue 3 控制面板 / Vue 3 Control Panel**：内置服务器控制和工具管理界面 / Built-in server control and tool management UI
-- **工具配置管理 / Tool Configuration**：按需启用/禁用工具，保存自定义配置 / Enable/disable tools on demand and save custom configurations
-- **自动启动 / Auto-start**：可配置插件加载时自动启动服务器 / Optionally start the server automatically when the extension loads
-- **双语支持 / Bilingual UI**：中文/英文界面 / English and Chinese interface
+- 标准 MCP JSON-RPC 2.0 / Streamable HTTP 传输
+- Cocos Creator 编辑器 IPC 与 `scene.ts` 引擎上下文调用
+- Vue 3 控制面板、服务器设置和工具启停管理
+- Bearer Token 鉴权、Origin 白名单、请求大小限制和工具超时
+- 高风险工具默认关闭，执行时必须显式传入 `confirm: true`
+- MCP 参数 JSON Schema 校验和结构化错误返回
+- Node.js 内置测试框架覆盖 HTTP 协议与关键 Cocos API 契约
 
----
+## 兼容性
 
-## 兼容性 / Compatibility
-
-| Cocos Creator | 状态 / Status |
+| 项目 | 支持情况 |
 |---|---|
-| 3.8.x | 完全支持 / Fully supported |
-| 3.7.x | 未测试 / Untested |
+| Cocos Creator | 3.8.x |
+| Node.js | MCP SDK 要求 Node.js 18+；仍需在目标 Cocos Electron 运行时验证 |
+| MCP 传输 | Streamable HTTP |
+| 监听地址 | `127.0.0.1` |
 
----
+## 安装与构建
 
-## 安装方法 / Installation
+将仓库放入项目级或全局扩展目录：
 
-### 方式一：项目级插件 / Option 1: Project-level Extension
-
-将插件目录复制到 Cocos Creator 项目的 `extensions` 目录下：
-
-Copy the plugin folder into the `extensions` directory of your Cocos Creator project:
-
-```
-{your-project}/
-└── extensions/
-    └── cocos-mcp-server/
+```text
+{cocos-project}/extensions/cocos-mcp-server/
 ```
 
-### 方式二：全局插件 / Option 2: Global Extension
-
-将插件目录复制到全局插件目录：
-
-Copy the plugin folder to the global extensions directory:
-
-```
+```text
 ~/.CocosCreator/extensions/cocos-mcp-server/
 ```
 
-### 启用插件 / Enable the Extension
-
-1. 打开 Cocos Creator 3.8.x / Open Cocos Creator 3.8.x
-2. 菜单栏 → **扩展** → **扩展管理器** / Go to **Extension** → **Extension Manager**
-3. 在 **项目** 或 **全局** 标签页找到 `cocos-mcp-server` / Find `cocos-mcp-server` under the **Project** or **Global** tab
-4. 点击启用 / Click **Enable**
-
----
-
-## 开发构建 / Development Build
+从源码安装后执行：
 
 ```bash
-# 安装依赖 / Install dependencies
 npm install
-
-# 编译 TypeScript / Compile TypeScript
 npm run build
-
-# 开发模式（文件监听）/ Development mode (file watching)
-npm run watch
 ```
 
-编译输出位于 `dist/` 目录。/ Compiled output is placed in the `dist/` directory.
+然后在 Cocos Creator 的 **扩展 → 扩展管理器** 中启用 `cocos-mcp-server`。
 
----
+> 当前发布流程尚未固化为包含 `dist/` 的安装包。从源码安装时必须先构建，详见 [TODO.md](TODO.md)。
 
-## 使用方法 / Usage
+## 快速开始
 
-### 1. 启动服务器 / Start the Server
+1. 通过 **扩展 → Cocos MCP Server** 打开控制面板。
+2. 复制自动生成的“访问令牌”。
+3. 点击“启动服务器”。
+4. 使用 `http://127.0.0.1:3000/mcp` 和 Bearer Token 配置客户端。
 
-插件启用后，通过菜单 **扩展 → Cocos MCP Server** 打开控制面板，点击"启动服务器"。
+### Claude Code
 
-After enabling the extension, open the control panel via **Extension → Cocos MCP Server**, then click **Start Server**.
-
-默认服务器地址 / Default server address：`http://127.0.0.1:3000/mcp`
-
-### 2. 连接 AI 客户端 / Connect an AI Client
-
-**Claude Code:**
 ```bash
-claude mcp add --transport http cocos-creator http://127.0.0.1:3000/mcp
+claude mcp add --transport http \
+  --header "Authorization: Bearer <access-token>" \
+  cocos-creator http://127.0.0.1:3000/mcp
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`):
+### HTTP 客户端配置
+
 ```json
 {
   "mcpServers": {
     "cocos-creator": {
+      "type": "http",
       "url": "http://127.0.0.1:3000/mcp",
-      "transport": "http"
+      "headers": {
+        "Authorization": "Bearer <access-token>"
+      }
     }
   }
 }
 ```
 
-**Cursor / VS Code:**
-在 MCP 设置中添加 HTTP 类型服务器，URL 填写 `http://127.0.0.1:3000/mcp`。
+不同客户端的字段可能略有差异，但都需要把令牌作为 `Authorization: Bearer <access-token>` 请求头发送。
 
-Add an HTTP-type MCP server in your MCP settings and set the URL to `http://127.0.0.1:3000/mcp`.
+## 安全模型
 
----
+- HTTP 服务只监听 `127.0.0.1`。
+- 首次加载时生成随机访问令牌，持久化到 `{project}/settings/mcp-server.json`。
+- 除 `/health` 外，所有端点都需要 Bearer Token 或 `X-MCP-Token`。
+- 浏览器跨域默认关闭；只允许设置中明确列出的 Origin。
+- REST API 默认关闭。
+- 危险工具默认禁用；即使启用，也必须在参数中传入 `confirm: true`。
+- 工具参数通过 JSON Schema 校验；工具执行失败会返回 MCP `isError: true`。
 
-## 工具列表 / Tool Reference
+不要提交包含真实 `authToken` 的项目设置文件。
 
-### 场景工具 / Scene Tools (8)
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `get_current_scene` | 获取当前场景信息 / Get current scene information |
-| `get_scene_list` | 获取项目场景列表 / List all scenes in the project |
-| `open_scene` | 打开指定场景 / Open a scene by path |
-| `save_scene` | 保存当前场景 / Save the current scene |
-| `create_scene` | 创建新场景 / Create a new scene |
-| `save_scene_as` | 场景另存为 / Save the current scene to a new path |
-| `close_scene` | 关闭当前场景 / Close the current scene |
-| `get_scene_hierarchy` | 获取场景层级结构 / Get the full scene node hierarchy |
+## HTTP 端点
 
-### 节点工具 / Node Tools (11)
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `create_node` | 创建新节点 / Create a new node |
-| `get_node_info` | 获取节点详细信息 / Get detailed information about a node |
-| `find_nodes` | 按条件查找节点 / Find nodes by filter criteria |
-| `find_node_by_name` | 按名称查找节点 / Find a node by name |
-| `get_all_nodes` | 获取场景所有节点 / Get all nodes in the scene |
-| `set_node_property` | 设置节点属性 / Set a property on a node |
-| `set_node_transform` | 设置节点变换（位置/旋转/缩放）/ Set node position, rotation, and scale |
-| `delete_node` | 删除节点 / Delete a node |
-| `move_node` | 移动节点到新父节点 / Move a node to a new parent |
-| `duplicate_node` | 复制节点 / Duplicate a node |
-| `detect_node_type` | 检测节点类型 / Detect the type of a node |
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| `GET` | `/health` | 否 | 健康状态、工具数和会话数 |
+| `POST` | `/mcp` | 是 | MCP 初始化、通知和工具调用 |
+| `GET` | `/mcp` | 是 | MCP SSE 流，由会话和客户端能力决定 |
+| `DELETE` | `/mcp` | 是 | 关闭 MCP 会话 |
+| `GET` | `/api/tools` | 是 | REST API 启用时列出工具与示例 |
+| `POST` | `/api/{category}/{tool}` | 是 | REST API 启用时调用工具 |
 
-### 组件工具 / Component Tools
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `add_component` | 添加组件 / Add a component to a node |
-| `remove_component` | 移除组件 / Remove a component from a node |
-| `get_component_info` | 获取组件信息 / Get component information |
-| `set_component_property` | 设置组件属性 / Set a component property value |
-| `get_components` | 获取节点所有组件 / Get all components on a node |
-| `reset_node_property` | 重置节点属性 / Reset a node property to its default |
-| `reset_component` | 重置组件属性 / Reset a component to its default values |
-| `execute_component_method` | 执行组件方法 / Call a method on a component |
+初始化成功后，客户端必须在后续 MCP 请求中携带服务端返回的 `MCP-Session-Id` 和协商后的 `MCP-Protocol-Version`。
 
-### 预制体工具 / Prefab Tools
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `create_prefab` | 从节点创建预制体 / Create a prefab asset from a node |
-| `instantiate_prefab` | 实例化预制体 / Instantiate a prefab into the scene |
-| `edit_prefab` | 进入预制体编辑模式 / Enter prefab editing mode |
-| `save_prefab` | 保存预制体 / Save the current prefab |
-| `exit_prefab_edit` | 退出预制体编辑模式 / Exit prefab editing mode |
-| `revert_prefab` | 从预制体还原节点 / Revert a prefab instance to the asset |
-| `apply_prefab` | 将节点变更应用到预制体 / Apply node changes back to the prefab asset |
+## 工具分类
 
-### 资源工具 / Asset Tools
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `import_asset` | 导入资源文件 / Import an asset file |
-| `get_asset_info` | 获取资源信息 / Get information about an asset |
-| `get_assets` | 获取资源列表 / List assets in the project |
-| `create_asset` | 创建新资源 / Create a new asset |
-| `copy_asset` | 复制资源 / Copy an asset to a new path |
-| `move_asset` | 移动资源 / Move an asset to a new path |
-| `delete_asset` | 删除资源 / Delete an asset |
-| `refresh_assets` | 刷新资源数据库 / Refresh the asset database |
-| `query_asset_path` | 按 UUID 查询资源路径 / Query an asset path by UUID |
-| `query_asset_uuid` | 按路径查询资源 UUID / Query an asset UUID by path |
-| `find_asset_by_name` | 按名称搜索资源 / Search for assets by name |
+MCP 暴露的完整工具名格式为 `<category>_<tool>`，例如 `node_create_node`。
 
-### 项目工具 / Project Tools
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `get_project_info` | 获取项目基本信息 / Get basic project information |
-| `get_project_settings` | 获取项目设置 / Get project settings |
-| `run_project` | 运行项目预览 / Run the project preview |
-| `build_project` | 构建项目 / Build the project |
-| `open_build_panel` | 打开构建面板 / Open the build panel |
-| `check_builder_status` | 检查构建器状态 / Check the builder worker status |
+| 分类 | 数量 | 用途 |
+|---|---:|---|
+| `scene` | 8 | 场景查询、打开、保存和层级结构 |
+| `node` | 11 | 节点创建、查找、变换、移动和删除 |
+| `component` | 7 | 组件查询、增删、属性设置和脚本挂载 |
+| `prefab` | 10 | 预制体查询、实例化、创建、更新和还原 |
+| `project` | 24 | 项目信息、资源数据库、构建面板和预览服务 |
+| `debug` | 10 | 日志、节点树、性能、场景验证和脚本执行 |
+| `preferences` | 7 | 编辑器偏好设置查询、修改和导入导出 |
+| `server` | 6 | Cocos 编辑器服务器和网络信息 |
+| `broadcast` | 5 | 编辑器广播监听与日志 |
+| `sceneAdvanced` | 23 | 撤销、快照、复制粘贴和高级场景操作 |
+| `sceneView` | 20 | Gizmo、网格、相机和场景视图设置 |
+| `referenceImage` | 12 | 场景参考图管理 |
+| `assetAdvanced` | 11 | 批量资源、依赖分析、压缩和清单 |
+| `validation` | 3 | JSON、字符串和 MCP 请求格式辅助 |
+| **合计** | **157** | |
 
-### 调试工具 / Debug Tools (10)
-| 工具名 / Tool | 说明 / Description |
-|---|---|
-| `get_console_logs` | 获取控制台日志 / Retrieve console log entries |
-| `clear_console` | 清空控制台 / Clear the editor console |
-| `log_message` | 输出日志信息 / Write a log message to the console |
-| `get_editor_info` | 获取编辑器信息 / Get editor version and environment info |
+当前启用的工具以运行时 `tools/list` 为准。启用 REST API 后，也可通过 `/api/tools` 查看当前启用工具。
 
-### 场景视图工具 / Scene View Tools (18)
-操控场景视图中的 Gizmo 工具、坐标系、视图模式、网格显示等。
+## 设置
 
-Control gizmo tools, coordinate systems, view modes, grid display, and other scene viewport settings.
+设置保存在 `{project}/settings/`：
 
-### 高级场景工具 / Advanced Scene Tools (18)
-撤销录制、节点复制粘贴剪切、场景快照、软重载等高级操作。
+- `mcp-server.json`：服务器、安全和限制设置
+- `tool-manager.json`：工具配置及启停状态
 
-Undo recording, node copy/paste/cut, scene snapshots, soft reload, and other advanced operations.
+| 设置 | 默认值 | 说明 |
+|---|---:|---|
+| `port` | `3000` | HTTP 监听端口 |
+| `autoStart` | `false` | 插件加载时自动启动 |
+| `enableDebugLog` | `false` | 输出服务器调试日志 |
+| `maxConnections` | `10` | 最大 MCP 会话及并发请求限制 |
+| `authToken` | 自动生成 | HTTP 访问令牌 |
+| `allowedOrigins` | `[]` | 浏览器 Origin 白名单 |
+| `requestBodyLimitBytes` | `1048576` | 最大请求体，默认 1 MiB |
+| `toolExecutionTimeoutMs` | `30000` | 单个工具执行超时 |
+| `enableRestApi` | `false` | 是否启用 `/api/*` |
 
-### 参考图工具 / Reference Image Tools
-场景视图中参考图片的添加、移除、变换操作。
+## 架构
 
-Add, remove, and transform reference images in the scene viewport.
-
-### 高级资源工具 / Advanced Asset Tools
-批量资源操作、资源依赖分析等。
-
-Batch asset operations and asset dependency analysis.
-
-### 广播工具 / Broadcast Tools (5)
-向编辑器发送自定义事件广播。
-
-Send custom event broadcasts to the editor.
-
-### 服务器工具 / Server Tools (6)
-查询服务器状态、连接信息、工具列表等。
-
-Query server status, connection information, and the active tool list.
-
-### 验证工具 / Validation Tools (3)
-场景完整性验证、资源依赖验证、MCP 响应格式验证。
-
-Scene integrity validation, asset dependency validation, and MCP response format validation.
-
----
-
-## 服务器设置 / Server Settings
-
-| 设置项 / Setting | 默认值 / Default | 说明 / Description |
-|---|---|---|
-| 端口 / Port | `3000` | HTTP 服务器监听端口 / HTTP server listening port |
-| 自动启动 / Auto Start | `false` | 插件加载时自动启动服务器 / Start automatically on extension load |
-| 调试日志 / Debug Log | `false` | 是否输出详细调试日志 / Enable verbose debug logging |
-| 最大连接数 / Max Connections | `10` | 同时允许的最大客户端数量 / Maximum simultaneous client connections |
-
----
-
-## 工具管理 / Tool Management
-
-控制面板的"工具管理"标签页支持：
-
-The **Tool Management** tab in the control panel supports:
-
-- **按类别管理 / Per-category control**：每个工具类别独立控制 / Enable or disable tools by category
-- **批量操作 / Bulk operations**：全选/全不选 / Select all / deselect all
-- **保存配置 / Persistent config**：将工具启用状态持久化 / Save the enabled/disabled state across sessions
-
-禁用不需要的工具可减小 AI 的工具上下文，提高响应效率。
-
-Disabling unused tools reduces the AI's tool context size and can improve response efficiency.
-
----
-
-## 项目结构 / Project Structure
-
-```
-cocos-mcp-server/
-├── package.json              # 插件清单 / Extension manifest
-├── tsconfig.json             # TypeScript 配置 / TypeScript configuration
-├── base.tsconfig.json        # 基础 TS 配置 / Base TypeScript configuration
-├── i18n/
-│   ├── en.js                 # 英文本地化 / English localization
-│   └── zh.js                 # 中文本地化 / Chinese localization
-├── static/
-│   ├── icon.png              # 插件图标 / Extension icon
-│   ├── style/default/        # 面板样式 / Panel stylesheet
-│   └── template/             # 面板 HTML 模板 / Panel HTML templates
-├── source/
-│   ├── main.ts               # 插件入口 / Extension entry point
-│   ├── mcp-server.ts         # HTTP MCP 服务器核心 / HTTP MCP server core
-│   ├── scene.ts              # 场景脚本（引擎 API）/ Scene script (engine API access)
-│   ├── settings.ts           # 设置持久化 / Settings persistence
-│   ├── types/index.ts        # TypeScript 类型定义 / TypeScript type definitions
-│   ├── panels/default/       # Vue 3 控制面板 / Vue 3 control panel
-│   └── tools/                # 工具模块（14个）/ Tool modules (14 categories)
-└── dist/                     # 编译输出 / Compiled JavaScript output
+```text
+AI Client
+    |
+    | MCP Streamable HTTP + Bearer Token
+    v
+MCPServer (source/mcp-server.ts)
+    |
+    | Editor.Message IPC
+    v
+Extension Main Process (source/main.ts)
+    |
+    | execute-scene-script
+    v
+Scene Script Context (source/scene.ts)
+    |
+    v
+cc.* Engine APIs
 ```
 
----
+关键约束：`cc.*` 只能在 `scene.ts` 的场景脚本上下文中调用。扩展进程中的工具必须通过 `Editor.Message` 路由。
 
-## 架构说明 / Architecture
+## 开发
 
-```
-AI 客户端 / AI Client (Claude / Cursor)
-       │  HTTP JSON-RPC 2.0
-       ▼
-MCP HTTP 服务器 / MCP HTTP Server (localhost:3000)
-       │  Editor.Message IPC
-       ▼
-Cocos Creator 编辑器进程 / Editor Process
-       │  execute-scene-script
-       ▼
-场景脚本 / Scene Script (engine API: cc.*)
+```bash
+npm run build       # TypeScript -> dist/
+npm run watch       # 监听编译
+npm test            # 构建并运行 Node.js 回归测试
+npm audit           # 依赖安全审计
 ```
 
-- **主进程 / Main process** (`main.ts`)：管理服务器生命周期、插件消息处理 / Manages the server lifecycle and handles extension messages
-- **MCP 服务器 / MCP server** (`mcp-server.ts`)：实现 JSON-RPC 2.0 协议，路由工具调用 / Implements the JSON-RPC 2.0 protocol and routes tool calls
-- **工具模块 / Tool modules** (`tools/*.ts`)：封装具体的 `Editor.Message` 调用 / Wrap specific `Editor.Message` calls for each operation
-- **场景脚本 / Scene script** (`scene.ts`)：在引擎上下文中运行，直接访问 `cc` API / Runs in the engine context with direct access to `cc` APIs
-- **控制面板 / Control panel** (`panels/default/index.ts`)：Vue 3 UI，通过 IPC 与主进程通信 / Vue 3 UI that communicates with the main process via IPC
+测试覆盖：
 
----
+- MCP 初始化、会话、鉴权、Origin、工具列表和参数错误
+- 空工具配置与危险工具确认参数
+- 组件删除、节点复制、Prefab 还原、Builder、场景视图等关键 Cocos 消息契约
 
-## 常见问题 / Troubleshooting
+仍需在 Cocos Creator 3.8.x 中进行真实编辑器集成测试。
 
-**Q: 服务器启动失败，提示端口被占用 / The server fails to start with a "port in use" error.**
+## 新增工具
 
-在控制面板修改端口号（默认 3000），保存设置后重新启动。
+1. 在现有 `ToolExecutor` 中添加定义和执行分支，或创建新分类。
+2. 需要 `cc.*` 时，在 `scene.ts` 添加方法，并同步 `package.json` 的 `contributions.scene.methods`。
+3. 在 `source/tools/tool-security.ts` 中评估危险性和确认要求。
+4. 为输入参数提供准确的 JSON Schema。
+5. 为 Cocos 消息参数和返回值补充契约测试。
+6. 运行 `npm test`。
 
-Change the port number in the control panel (default is 3000) and restart the server.
+## 已知限制
 
----
+- `run_project` 和 `build_project` 当前主要打开 Cocos 构建面板，完整构建仍需 UI 操作。
+- 部分 Prefab 高级流程包含历史兼容代码，尚需在真实项目中系统验证。
+- 工具分类文件体积较大，类型中仍有较多 `any`。
+- 当前自动测试不启动 Cocos Creator。
 
-**Q: AI 工具调用失败，返回 "Scene not ready" / AI tool calls fail with "Scene not ready".**
+后续升级计划见 [TODO.md](TODO.md)。
 
-确保 Cocos Creator 中已打开一个场景。场景脚本需要活跃的场景上下文。
+## 常见问题
 
-Make sure a scene is open in Cocos Creator. The scene script requires an active scene context to operate.
+**返回 `401 Unauthorized`**
 
----
+检查客户端是否发送了控制面板中当前令牌对应的 `Authorization` 请求头。
 
-**Q: 插件在扩展管理器中不显示 / The extension does not appear in the Extension Manager.**
+**返回 `403 Forbidden origin`**
 
-检查插件目录名是否与 `package.json` 中的 `name` 字段一致（`cocos-mcp-server`）。
+非浏览器客户端通常不要发送 `Origin`。浏览器客户端需将精确 Origin 加入 `allowedOrigins`。
 
-Verify that the plugin folder name matches the `name` field in `package.json` (`cocos-mcp-server`).
+**工具未出现在 `tools/list`**
 
----
+在控制面板的工具管理中启用该工具。危险工具默认关闭。
 
-**Q: 修改源码后如何更新 / How do I apply source code changes?**
+**返回 `Scene not ready`**
 
-运行 `npm run build`，然后在扩展管理器中禁用再重新启用插件。
+先在 Cocos Creator 中打开一个场景。
 
-Run `npm run build`, then disable and re-enable the extension in the Extension Manager.
+**修改源码后没有生效**
 
----
+运行 `npm run build`，再在扩展管理器中重新加载扩展。
 
-## 许可证 / License
+## License
 
 MIT

@@ -6,20 +6,22 @@
     "editor": ">=3.8.0",
     "scripts": {
         "build": "tsc",
-        "watch": "tsc -w"
+        "watch": "tsc -w",
+        "test": "npm run build && node --test test/*.test.js"
     },
     "description": "i18n:cocos-mcp-server.description",
     "main": "./dist/main.js",
     "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.29.0",
+        "ajv": "^8.20.0",
         "fs-extra": "^11.3.0",
-        "uuid": "^9.0.1",
-        "vue": "^3.1.4"
+        "vue": "^3.5.35",
+        "zod": "^3.25.76"
     },
     "devDependencies": {
         "@cocos/creator-types": "^3.8.6",
         "@types/fs-extra": "^9.0.5",
         "@types/node": "^18.17.1",
-        "@types/uuid": "^9.0.8",
         "typescript": "^5.8.2"
     },
     "panels": {
@@ -46,55 +48,89 @@
         ],
         "messages": {
             "open-panel": {
-                "methods": ["openPanel"]
+                "methods": [
+                    "openPanel"
+                ]
             },
             "start-server": {
-                "methods": ["startServer"]
+                "methods": [
+                    "startServer"
+                ]
             },
             "stop-server": {
-                "methods": ["stopServer"]
+                "methods": [
+                    "stopServer"
+                ]
             },
             "get-server-status": {
-                "methods": ["getServerStatus"]
+                "methods": [
+                    "getServerStatus"
+                ]
             },
             "update-settings": {
-                "methods": ["updateSettings"]
+                "methods": [
+                    "updateSettings"
+                ]
             },
             "getToolsList": {
-                "methods": ["getToolsList"]
+                "methods": [
+                    "getToolsList"
+                ]
             },
             "get-server-settings": {
-                "methods": ["getServerSettings"]
+                "methods": [
+                    "getServerSettings"
+                ]
             },
             "getToolManagerState": {
-                "methods": ["getToolManagerState"]
+                "methods": [
+                    "getToolManagerState"
+                ]
             },
             "createToolConfiguration": {
-                "methods": ["createToolConfiguration"]
+                "methods": [
+                    "createToolConfiguration"
+                ]
             },
             "updateToolConfiguration": {
-                "methods": ["updateToolConfiguration"]
+                "methods": [
+                    "updateToolConfiguration"
+                ]
             },
             "deleteToolConfiguration": {
-                "methods": ["deleteToolConfiguration"]
+                "methods": [
+                    "deleteToolConfiguration"
+                ]
             },
             "setCurrentToolConfiguration": {
-                "methods": ["setCurrentToolConfiguration"]
+                "methods": [
+                    "setCurrentToolConfiguration"
+                ]
             },
             "updateToolStatus": {
-                "methods": ["updateToolStatus"]
+                "methods": [
+                    "updateToolStatus"
+                ]
             },
             "updateToolStatusBatch": {
-                "methods": ["updateToolStatusBatch"]
+                "methods": [
+                    "updateToolStatusBatch"
+                ]
             },
             "exportToolConfiguration": {
-                "methods": ["exportToolConfiguration"]
+                "methods": [
+                    "exportToolConfiguration"
+                ]
             },
             "importToolConfiguration": {
-                "methods": ["importToolConfiguration"]
+                "methods": [
+                    "importToolConfiguration"
+                ]
             },
             "getEnabledTools": {
-                "methods": ["getEnabledTools"]
+                "methods": [
+                    "getEnabledTools"
+                ]
             }
         },
         "scene": {
@@ -103,9 +139,12 @@
                 "createNewScene",
                 "addComponentToNode",
                 "removeComponentFromNode",
+                "createNode",
                 "getNodeInfo",
                 "getAllNodes",
+                "findNodes",
                 "findNodeByName",
+                "attachScript",
                 "setNodeProperty",
                 "setComponentProperty",
                 "getCurrentSceneInfo",

@@ -14,9 +14,29 @@ function requireActiveScene(): any {
 }
 
 function findNodeByUuid(scene: any, nodeUuid: string): any {
-    const node = scene.getChildByUuid(nodeUuid);
+    const visit = (node: any): any => {
+        if (node.uuid === nodeUuid) return node;
+        for (const child of node.children ?? []) {
+            const found = visit(child);
+            if (found) return found;
+        }
+        return null;
+    };
+    const node = visit(scene);
     if (!node) throw new Error(`Node not found: ${nodeUuid}`);
     return node;
+}
+
+function findDescendantByName(scene: any, name: string): any {
+    const visit = (node: any): any => {
+        if (node !== scene && node.name === name) return node;
+        for (const child of node.children ?? []) {
+            const found = visit(child);
+            if (found) return found;
+        }
+        return null;
+    };
+    return visit(scene);
 }
 
 function findComponentClass(componentType: string): any {
@@ -24,6 +44,25 @@ function findComponentClass(componentType: string): any {
     const cls = js.getClassByName(componentType);
     if (!cls) throw new Error(`Component type not found: ${componentType}`);
     return cls;
+}
+
+function loadAssetReference(cc: any, value: string, assetType: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+        cc.assetManager.resources.load(value, assetType, (resourceError: any, resource: any) => {
+            if (!resourceError && resource) {
+                resolve(resource);
+                return;
+            }
+
+            cc.assetManager.loadAny({ uuid: value }, (uuidError: any, asset: any) => {
+                if (uuidError || !asset) {
+                    reject(uuidError ?? resourceError ?? new Error(`Asset not found: ${value}`));
+                    return;
+                }
+                resolve(asset);
+            });
+        });
+    });
 }
 
 export const methods: { [key: string]: (...any: any) => any } = {
@@ -76,7 +115,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
             const { Node } = require('cc');
             const scene = requireActiveScene();
             const node = new Node(name);
-            const parent = parentUuid ? (scene.getChildByUuid(parentUuid) ?? scene) : scene;
+            const parent = parentUuid ? findNodeByUuid(scene, parentUuid) : scene;
             parent.addChild(node);
             return {
                 success: true,
@@ -139,7 +178,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
     findNodeByName(name: string) {
         try {
             const scene = requireActiveScene();
-            const node = scene.getChildByName(name);
+            const node = findDescendantByName(scene, name);
             if (!node) {
                 return { success: false, error: `Node not found: ${name}` };
             }
@@ -150,6 +189,62 @@ export const methods: { [key: string]: (...any: any) => any } = {
                     name: node.name,
                     active: node.active,
                     position: node.position
+                }
+            };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    findNodes(pattern: string, exactMatch: boolean = false) {
+        try {
+            const scene = requireActiveScene();
+            const normalizedPattern = pattern.toLowerCase();
+            const nodes: any[] = [];
+
+            const visit = (node: any, parentPath: string) => {
+                const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+                if (node !== scene) {
+                    const matches = exactMatch
+                        ? node.name === pattern
+                        : node.name.toLowerCase().includes(normalizedPattern);
+                    if (matches) {
+                        nodes.push({
+                            uuid: node.uuid,
+                            name: node.name,
+                            path: nodePath
+                        });
+                    }
+                }
+                for (const child of node.children ?? []) {
+                    visit(child, nodePath);
+                }
+            };
+
+            visit(scene, '');
+            return { success: true, data: nodes };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    attachScript(nodeUuid: string, scriptPath: string) {
+        try {
+            const scene = requireActiveScene();
+            const node = findNodeByUuid(scene, nodeUuid);
+            const scriptName = scriptPath.split('/').pop()?.replace(/\.[^.]+$/, '');
+            if (!scriptName) {
+                return { success: false, error: `Invalid script path: ${scriptPath}` };
+            }
+            const ComponentClass = findComponentClass(scriptName);
+            const existing = node.getComponent(ComponentClass);
+            const component = existing ?? node.addComponent(ComponentClass);
+            return {
+                success: true,
+                message: `Script ${scriptName} attached successfully`,
+                data: {
+                    componentId: component.uuid,
+                    existing: Boolean(existing)
                 }
             };
         } catch (error: any) {
@@ -222,22 +317,18 @@ export const methods: { [key: string]: (...any: any) => any } = {
     createPrefabFromNode(nodeUuid: string, prefabPath: string) {
         try {
             const scene = requireActiveScene();
-            const node = findNodeByUuid(scene, nodeUuid);
-            // Prefab file creation requires Editor API support and cannot be done at runtime.
+            findNodeByUuid(scene, nodeUuid);
             return {
-                success: true,
-                data: {
-                    prefabPath,
-                    sourceNodeUuid: nodeUuid,
-                    message: `Prefab created from node '${node.name}' at ${prefabPath}`
-                }
+                success: false,
+                error: 'Prefab file creation is not supported in the scene script context',
+                instruction: `Use the editor prefab tool to create ${prefabPath}`
             };
         } catch (error: any) {
             return { success: false, error: error.message };
         }
     },
 
-    setComponentProperty(nodeUuid: string, componentType: string, property: string, value: any) {
+    async setComponentProperty(nodeUuid: string, componentType: string, property: string, value: any) {
         try {
             const scene = requireActiveScene();
             const node = findNodeByUuid(scene, nodeUuid);
@@ -250,27 +341,9 @@ export const methods: { [key: string]: (...any: any) => any } = {
             const cc = require('cc');
 
             if (property === 'spriteFrame' && componentType === 'cc.Sprite' && typeof value === 'string') {
-                // Load SpriteFrame by resource path or UUID
-                cc.assetManager.resources.load(value, cc.SpriteFrame, (err: any, spriteFrame: any) => {
-                    if (!err && spriteFrame) {
-                        component.spriteFrame = spriteFrame;
-                    } else {
-                        cc.assetManager.loadAny({ uuid: value }, (err2: any, asset: any) => {
-                            component.spriteFrame = err2 ? value : asset;
-                        });
-                    }
-                });
+                component.spriteFrame = await loadAssetReference(cc, value, cc.SpriteFrame);
             } else if (property === 'material' && typeof value === 'string') {
-                // Load Material by resource path or UUID
-                cc.assetManager.resources.load(value, cc.Material, (err: any, material: any) => {
-                    if (!err && material) {
-                        component.material = material;
-                    } else {
-                        cc.assetManager.loadAny({ uuid: value }, (err2: any, asset: any) => {
-                            component.material = err2 ? value : asset;
-                        });
-                    }
-                });
+                component.material = await loadAssetReference(cc, value, cc.Material);
             } else {
                 component[property] = value;
             }

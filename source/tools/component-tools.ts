@@ -289,16 +289,19 @@ export class ComponentTools implements ToolExecutor {
                 return;
             }
             // Step 2: Find component whose type field matches componentType (cid)
-            const exists = allComponentsInfo.data.components.some((comp: any) => comp.type === componentType);
-            if (!exists) {
+            const component = allComponentsInfo.data.components.find((comp: any) => comp.type === componentType);
+            if (!component) {
                 resolve({ success: false, error: `Component cid '${componentType}' not found on node '${nodeUuid}'. Use getComponents to get the type field (cid) as componentType.` });
+                return;
+            }
+            if (!component.uuid) {
+                resolve({ success: false, error: `Component cid '${componentType}' has no component UUID and cannot be removed safely.` });
                 return;
             }
             // Step 3: Remove via official API
             try {
                 await Editor.Message.request('scene', 'remove-component', {
-                    uuid: nodeUuid,
-                    component: componentType
+                    uuid: component.uuid
                 });
                 // Step 4: Re-query to confirm removal
                 const afterRemoveInfo = await this.getComponents(nodeUuid);
@@ -309,7 +312,7 @@ export class ComponentTools implements ToolExecutor {
                     resolve({
                         success: true,
                         message: `Component cid '${componentType}' removed successfully from node '${nodeUuid}'`,
-                        data: { nodeUuid, componentType }
+                        data: { nodeUuid, componentType, componentUuid: component.uuid }
                     });
                 }
             } catch (err: any) {

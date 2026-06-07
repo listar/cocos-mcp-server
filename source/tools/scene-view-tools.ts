@@ -521,7 +521,7 @@ export class SceneViewTools implements ToolExecutor {
 
     private async alignViewWithNode(): Promise<ToolResponse> {
         return new Promise((resolve) => {
-            Editor.Message.request('scene', 'align-with-view-node').then(() => {
+            Editor.Message.request('scene', 'align-view-with-node').then(() => {
                 resolve({
                     success: true,
                     message: 'View aligned with selected node'

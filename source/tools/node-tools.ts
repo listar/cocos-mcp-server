@@ -989,11 +989,13 @@ export class NodeTools implements ToolExecutor {
     private async duplicateNode(uuid: string, includeChildren: boolean = true): Promise<ToolResponse> {
         return new Promise((resolve) => {
             // Note: includeChildren parameter is accepted for future use but not currently implemented
-            Editor.Message.request('scene', 'duplicate-node', uuid).then((result: any) => {
+            Editor.Message.request('scene', 'duplicate-node', uuid).then((result: string | string[]) => {
+                const newUuids = Array.isArray(result) ? result : [result];
                 resolve({
                     success: true,
                     data: {
-                        newUuid: result.uuid,
+                        newUuid: newUuids[0],
+                        newUuids,
                         message: 'Node duplicated successfully'
                     }
                 });

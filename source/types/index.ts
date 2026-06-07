@@ -4,6 +4,10 @@ export interface MCPServerSettings {
     enableDebugLog: boolean;
     allowedOrigins: string[];
     maxConnections: number;
+    authToken: string;
+    requestBodyLimitBytes: number;
+    toolExecutionTimeoutMs: number;
+    enableRestApi: boolean;
 }
 
 export interface ServerStatus {
@@ -16,6 +20,16 @@ export interface ToolDefinition {
     name: string;
     description: string;
     inputSchema: any;
+    outputSchema?: any;
+    annotations?: ToolAnnotations;
+}
+
+export interface ToolAnnotations {
+    title?: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
 }
 
 export interface ToolResponse {
@@ -140,6 +154,7 @@ export interface ToolManagerSettings {
     configurations: ToolConfiguration[];
     currentConfigId: string;
     maxConfigSlots: number;
+    securityMigrationVersion: number;
 }
 
 export interface ToolManagerState {

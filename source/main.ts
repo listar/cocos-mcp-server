@@ -1,5 +1,5 @@
 import { MCPServer } from './mcp-server';
-import { readSettings, saveSettings } from './settings';
+import { normalizeSettings, readSettings, saveSettings } from './settings';
 import { MCPServerSettings } from './types';
 import { ToolManager } from './tools/tool-manager';
 
@@ -25,7 +25,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
             console.warn('[MCP] mcpServer is not initialized');
             return;
         }
-        mcpServer.stop();
+        await mcpServer.stop();
     },
 
     getServerStatus() {
@@ -34,13 +34,26 @@ export const methods: { [key: string]: (...any: any) => any } = {
         return { ...status, settings };
     },
 
-    updateSettings(settings: MCPServerSettings) {
-        saveSettings(settings);
+    async updateSettings(settings: Partial<MCPServerSettings>) {
+        const currentSettings = mcpServer ? mcpServer.getSettings() : readSettings();
+        const nextSettings = normalizeSettings(settings, currentSettings);
+        const wasRunning = mcpServer?.getStatus().running ?? false;
+
         if (mcpServer) {
-            mcpServer.stop();
+            await mcpServer.stop();
         }
-        mcpServer = new MCPServer(settings);
-        mcpServer.start();
+
+        saveSettings(nextSettings);
+        mcpServer = new MCPServer(nextSettings);
+        mcpServer.updateEnabledTools(toolManager.getEnabledTools());
+        if (wasRunning) {
+            await mcpServer.start();
+        }
+
+        return {
+            ...mcpServer.getStatus(),
+            settings: mcpServer.getSettings()
+        };
     },
 
     getToolsList() {
@@ -171,9 +184,9 @@ export function load() {
     }
 }
 
-export function unload() {
+export async function unload() {
     if (mcpServer) {
-        mcpServer.stop();
+        await mcpServer.stop();
         mcpServer = null;
     }
 }

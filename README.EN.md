@@ -1,281 +1,234 @@
 # Cocos MCP Server
 
-An AI MCP (Model Context Protocol) server plugin for Cocos Creator 3.8.x, enabling AI assistants (Claude, Cursor, etc.) to directly control the Cocos Creator editor.
+English | [中文](README.md)
 
-## Features
+A Cocos Creator 3.8.x editor extension that exposes scene, node, component, prefab, and project operations to Codex, Claude Code, Cursor, and other AI clients over MCP Streamable HTTP.
 
-- **MCP Protocol**: Standard JSON-RPC 2.0 over HTTP transport
-- **130+ Tools**: Full coverage of scene, node, component, prefab, asset, and project operations
-- **Vue 3 Control Panel**: Built-in server control and tool management UI
-- **Tool Configuration**: Enable/disable tools on demand and save custom configurations
-- **Auto-start**: Optionally start the server automatically when the extension loads
-- **Bilingual UI**: English and Chinese interface
+The current implementation provides **157 tools in 14 categories**, uses the official `@modelcontextprotocol/sdk`, and enables local authentication and high-risk operation safeguards by default.
+
+## Highlights
+
+- Standard MCP JSON-RPC 2.0 over Streamable HTTP
+- Cocos Creator editor IPC and `scene.ts` engine-context execution
+- Vue 3 control panel with server settings and per-tool enablement
+- Bearer authentication, Origin allowlist, request limits, and tool timeouts
+- Dangerous tools disabled by default and gated by `confirm: true`
+- JSON Schema validation and structured MCP error results
+- Node.js regression tests for HTTP behavior and key Cocos API contracts
 
 ## Compatibility
 
-| Cocos Creator | Status |
+| Item | Support |
 |---|---|
-| 3.8.x | Fully supported |
-| 3.7.x | Untested |
+| Cocos Creator | 3.8.x |
+| Node.js | The MCP SDK requires Node.js 18+; verify the target Cocos Electron runtime |
+| MCP transport | Streamable HTTP |
+| Bind address | `127.0.0.1` |
 
 ## Installation
 
-### Option 1: Project-level Extension
+Place the repository in a project-level or global extension directory:
 
-Copy the plugin folder into the `extensions` directory of your Cocos Creator project:
-
-```
-{your-project}/
-└── extensions/
-    └── cocos-mcp-server/    ← place the entire folder here
+```text
+{cocos-project}/extensions/cocos-mcp-server/
 ```
 
-### Option 2: Global Extension
-
-Copy the plugin folder to the global extensions directory:
-
-```
+```text
 ~/.CocosCreator/extensions/cocos-mcp-server/
 ```
 
-### Enable the Extension
-
-1. Open Cocos Creator 3.8.x
-2. Go to **Extension** → **Extension Manager** in the menu bar
-3. Find `cocos-mcp-server` under the **Project** or **Global** tab
-4. Click **Enable**
-
-## Development Build
-
-To build from source:
+For a source checkout, install dependencies and compile:
 
 ```bash
-# Install dependencies
 npm install
-
-# Compile TypeScript
 npm run build
-
-# Development mode (file watching)
-npm run watch
 ```
 
-Compiled output is placed in the `dist/` directory.
+Then enable `cocos-mcp-server` from **Extension → Extension Manager** in Cocos Creator.
 
-## Usage
+> The release workflow does not yet produce a finalized install bundle containing `dist/`. Source installations must be built first. See [TODO.md](TODO.md).
 
-### 1. Start the Server
+## Quick Start
 
-After enabling the extension, open the control panel via **Extension → Cocos MCP Server** in the menu bar, then click **Start Server**.
+1. Open **Extension → Cocos MCP Server**.
+2. Copy the generated access token.
+3. Start the server.
+4. Configure the client with `http://127.0.0.1:3000/mcp` and the Bearer token.
 
-Default server address: `http://127.0.0.1:3000/mcp`
+### Claude Code
 
-### 2. Connect an AI Client
-
-**Claude Code:**
 ```bash
-claude mcp add --transport http cocos-creator http://127.0.0.1:3000/mcp
+claude mcp add --transport http \
+  --header "Authorization: Bearer <access-token>" \
+  cocos-creator http://127.0.0.1:3000/mcp
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`):
+### HTTP Client Configuration
+
 ```json
 {
   "mcpServers": {
     "cocos-creator": {
+      "type": "http",
       "url": "http://127.0.0.1:3000/mcp",
-      "transport": "http"
+      "headers": {
+        "Authorization": "Bearer <access-token>"
+      }
     }
   }
 }
 ```
 
-**Cursor / VS Code:**
-Add an HTTP-type MCP server in your MCP settings and set the URL to `http://127.0.0.1:3000/mcp`.
+Client configuration fields vary, but the token must be sent as `Authorization: Bearer <access-token>`.
 
-## Tool Reference
+## Security Model
 
-### Scene Tools (8)
-| Tool | Description |
-|---|---|
-| `get_current_scene` | Get current scene information |
-| `get_scene_list` | List all scenes in the project |
-| `open_scene` | Open a scene by path |
-| `save_scene` | Save the current scene |
-| `create_scene` | Create a new scene |
-| `save_scene_as` | Save the current scene to a new path |
-| `close_scene` | Close the current scene |
-| `get_scene_hierarchy` | Get the full scene node hierarchy |
+- The HTTP server binds only to `127.0.0.1`.
+- A random access token is generated on first load and stored in `{project}/settings/mcp-server.json`.
+- Every endpoint except `/health` requires a Bearer token or `X-MCP-Token`.
+- Browser CORS access is denied by default and requires an exact configured Origin.
+- The REST API is disabled by default.
+- Dangerous tools are disabled by default and still require `confirm: true` when enabled.
+- Tool arguments are validated against JSON Schema.
+- Tool failures are returned with MCP `isError: true`.
 
-### Node Tools (11)
-| Tool | Description |
-|---|---|
-| `create_node` | Create a new node |
-| `get_node_info` | Get detailed information about a node |
-| `find_nodes` | Find nodes by filter criteria |
-| `find_node_by_name` | Find a node by name |
-| `get_all_nodes` | Get all nodes in the scene |
-| `set_node_property` | Set a property on a node |
-| `set_node_transform` | Set node position, rotation, and scale |
-| `delete_node` | Delete a node |
-| `move_node` | Move a node to a new parent |
-| `duplicate_node` | Duplicate a node |
-| `detect_node_type` | Detect the type of a node |
+Do not commit project settings containing a real `authToken`.
 
-### Component Tools
-| Tool | Description |
-|---|---|
-| `add_component` | Add a component to a node |
-| `remove_component` | Remove a component from a node |
-| `get_component_info` | Get component information |
-| `set_component_property` | Set a component property value |
-| `get_components` | Get all components on a node |
-| `reset_node_property` | Reset a node property to its default |
-| `reset_component` | Reset a component to its default values |
-| `execute_component_method` | Call a method on a component |
+## HTTP Endpoints
 
-### Prefab Tools
-| Tool | Description |
-|---|---|
-| `create_prefab` | Create a prefab asset from a node |
-| `instantiate_prefab` | Instantiate a prefab into the scene |
-| `edit_prefab` | Enter prefab editing mode |
-| `save_prefab` | Save the current prefab |
-| `exit_prefab_edit` | Exit prefab editing mode |
-| `revert_prefab` | Revert a prefab instance to the asset |
-| `apply_prefab` | Apply node changes back to the prefab asset |
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/health` | No | Health, tool, and session status |
+| `POST` | `/mcp` | Yes | MCP initialization, notifications, and requests |
+| `GET` | `/mcp` | Yes | MCP SSE stream, depending on session and client capabilities |
+| `DELETE` | `/mcp` | Yes | Close an MCP session |
+| `GET` | `/api/tools` | Yes | List tools when the REST API is enabled |
+| `POST` | `/api/{category}/{tool}` | Yes | Invoke a tool when the REST API is enabled |
 
-### Asset Tools
-| Tool | Description |
-|---|---|
-| `import_asset` | Import an asset file |
-| `get_asset_info` | Get information about an asset |
-| `get_assets` | List assets in the project |
-| `create_asset` | Create a new asset |
-| `copy_asset` | Copy an asset to a new path |
-| `move_asset` | Move an asset to a new path |
-| `delete_asset` | Delete an asset |
-| `refresh_assets` | Refresh the asset database |
-| `query_asset_path` | Query an asset path by UUID |
-| `query_asset_uuid` | Query an asset UUID by path |
-| `find_asset_by_name` | Search for assets by name |
+After initialization, clients must send the returned `MCP-Session-Id` and negotiated `MCP-Protocol-Version` on subsequent MCP requests.
 
-### Project Tools
-| Tool | Description |
-|---|---|
-| `get_project_info` | Get basic project information |
-| `get_project_settings` | Get project settings |
-| `run_project` | Run the project preview |
-| `build_project` | Build the project |
-| `open_build_panel` | Open the build panel |
-| `check_builder_status` | Check the builder worker status |
+## Tool Categories
 
-### Debug Tools (10)
-| Tool | Description |
-|---|---|
-| `get_console_logs` | Retrieve console log entries |
-| `clear_console` | Clear the editor console |
-| `log_message` | Write a log message to the console |
-| `get_editor_info` | Get editor version and environment info |
+Qualified MCP names use `<category>_<tool>`, for example `node_create_node`.
 
-### Scene View Tools (18)
-Control gizmo tools, coordinate systems, view modes, grid display, and other scene viewport settings.
+| Category | Count | Scope |
+|---|---:|---|
+| `scene` | 8 | Scene queries, opening, saving, and hierarchy |
+| `node` | 11 | Node creation, lookup, transforms, movement, and deletion |
+| `component` | 7 | Component queries, mutation, properties, and script attachment |
+| `prefab` | 10 | Prefab lookup, instantiation, creation, update, and restore |
+| `project` | 24 | Project data, asset database, builder UI, and preview server |
+| `debug` | 10 | Logs, node tree, performance, validation, and script execution |
+| `preferences` | 7 | Editor preference queries, mutation, import, and export |
+| `server` | 6 | Cocos editor server and network information |
+| `broadcast` | 5 | Editor broadcast listeners and logs |
+| `sceneAdvanced` | 23 | Undo, snapshots, clipboard, and advanced scene operations |
+| `sceneView` | 20 | Gizmos, grid, camera, and scene view settings |
+| `referenceImage` | 12 | Scene reference image management |
+| `assetAdvanced` | 11 | Batch assets, dependencies, compression, and manifests |
+| `validation` | 3 | JSON, string, and MCP request helpers |
+| **Total** | **157** | |
 
-### Advanced Scene Tools (18)
-Undo recording, node copy/paste/cut, scene snapshots, soft reload, and other advanced operations.
+Use runtime `tools/list` as the authoritative list of currently enabled tools. `/api/tools` exposes the same enabled set when the REST API is enabled.
 
-### Reference Image Tools
-Add, remove, and transform reference images in the scene viewport.
+## Settings
 
-### Advanced Asset Tools
-Batch asset operations and asset dependency analysis.
+Settings are stored under `{project}/settings/`:
 
-### Broadcast Tools (5)
-Send custom event broadcasts to the editor.
-
-### Server Tools (6)
-Query server status, connection information, and the active tool list.
-
-### Validation Tools (3)
-Scene integrity validation, asset dependency validation, and MCP response format validation.
-
-## Server Settings
+- `mcp-server.json`: server, security, and limit settings
+- `tool-manager.json`: tool configurations and enablement state
 
 | Setting | Default | Description |
-|---|---|---|
-| Port | `3000` | HTTP server listening port |
-| Auto Start | `false` | Start the server automatically on extension load |
-| Debug Log | `false` | Enable verbose debug logging |
-| Max Connections | `10` | Maximum number of simultaneous client connections |
-
-## Tool Management
-
-The **Tool Management** tab in the control panel supports:
-
-- **Per-category control**: Enable or disable tools by category
-- **Bulk operations**: Select all / deselect all
-- **Persistent config**: Save the enabled/disabled state across sessions
-
-Disabling unused tools reduces the AI's tool context size and can improve response efficiency.
-
-## Project Structure
-
-```
-cocos-mcp-server/
-├── package.json              # Extension manifest
-├── tsconfig.json             # TypeScript configuration
-├── base.tsconfig.json        # Base TypeScript configuration
-├── i18n/
-│   ├── en.js                 # English localization
-│   └── zh.js                 # Chinese localization
-├── static/
-│   ├── icon.png              # Extension icon
-│   ├── style/default/        # Panel stylesheet
-│   └── template/             # Panel HTML templates
-├── source/
-│   ├── main.ts               # Extension entry point
-│   ├── mcp-server.ts         # HTTP MCP server core
-│   ├── scene.ts              # Scene script (engine API access)
-│   ├── settings.ts           # Settings persistence
-│   ├── types/index.ts        # TypeScript type definitions
-│   ├── panels/default/       # Vue 3 control panel
-│   └── tools/                # Tool modules (14 categories)
-└── dist/                     # Compiled JavaScript output
-```
+|---|---:|---|
+| `port` | `3000` | HTTP listening port |
+| `autoStart` | `false` | Start when the extension loads |
+| `enableDebugLog` | `false` | Enable server debug logs |
+| `maxConnections` | `10` | Maximum MCP sessions and concurrent requests |
+| `authToken` | Generated | HTTP access token |
+| `allowedOrigins` | `[]` | Browser Origin allowlist |
+| `requestBodyLimitBytes` | `1048576` | Maximum request body, 1 MiB by default |
+| `toolExecutionTimeoutMs` | `30000` | Per-tool execution timeout |
+| `enableRestApi` | `false` | Enable `/api/*` |
 
 ## Architecture
 
-```
-AI Client (Claude / Cursor)
-       │  HTTP JSON-RPC 2.0
-       ▼
-MCP HTTP Server (localhost:3000)
-       │  Editor.Message IPC
-       ▼
-Cocos Creator Editor Process
-       │  execute-scene-script
-       ▼
-Scene Script (engine API: cc.*)
+```text
+AI Client
+    |
+    | MCP Streamable HTTP + Bearer Token
+    v
+MCPServer (source/mcp-server.ts)
+    |
+    | Editor.Message IPC
+    v
+Extension Main Process (source/main.ts)
+    |
+    | execute-scene-script
+    v
+Scene Script Context (source/scene.ts)
+    |
+    v
+cc.* Engine APIs
 ```
 
-- **Main process** (`main.ts`): Manages the server lifecycle and handles extension messages
-- **MCP server** (`mcp-server.ts`): Implements the JSON-RPC 2.0 protocol and routes tool calls
-- **Tool modules** (`tools/*.ts`): Wrap specific `Editor.Message` calls for each operation
-- **Scene script** (`scene.ts`): Runs in the engine context with direct access to `cc` APIs
-- **Control panel** (`panels/default/index.ts`): Vue 3 UI that communicates with the main process via IPC
+Important constraint: `cc.*` APIs can only run in the `scene.ts` scene-script context. Extension-process tools must route through `Editor.Message`.
+
+## Development
+
+```bash
+npm run build       # TypeScript -> dist/
+npm run watch       # Watch compilation
+npm test            # Build and run Node.js regression tests
+npm audit           # Dependency security audit
+```
+
+Current tests cover:
+
+- MCP initialization, sessions, authentication, Origin handling, tools, and validation errors
+- Empty tool configurations and dangerous-tool confirmation
+- Key Cocos message contracts for components, nodes, prefabs, builder, and scene view
+
+Real Cocos Creator 3.8.x editor integration testing is still required.
+
+## Adding a Tool
+
+1. Add a definition and execution branch to an existing `ToolExecutor`, or create a category.
+2. For `cc.*` access, add a `scene.ts` method and register it in `package.json` under `contributions.scene.methods`.
+3. Classify the tool in `source/tools/tool-security.ts`.
+4. Provide an accurate JSON Schema for its arguments.
+5. Add a contract test for Cocos message parameters and return values.
+6. Run `npm test`.
+
+## Known Limitations
+
+- `run_project` and `build_project` mainly open the Cocos builder UI; complete builds still require UI interaction.
+- Some advanced prefab paths contain historical compatibility code that needs systematic real-project verification.
+- Several tool modules are large and still rely heavily on `any`.
+- Automated tests do not launch Cocos Creator.
+
+See [TODO.md](TODO.md) for the upgrade roadmap.
 
 ## Troubleshooting
 
-**Q: The server fails to start with a "port in use" error.**
-A: Change the port number in the control panel (default is 3000) and restart the server.
+**`401 Unauthorized`**
 
-**Q: AI tool calls fail with "Scene not ready".**
-A: Make sure a scene is open in Cocos Creator. The scene script requires an active scene context to operate.
+Verify that the client sends the current token shown in the control panel.
 
-**Q: The extension does not appear in the Extension Manager.**
-A: Verify that the plugin folder name matches the `name` field in `package.json` (`cocos-mcp-server`).
+**`403 Forbidden origin`**
 
-**Q: How do I apply source code changes?**
-A: Run `npm run build`, then disable and re-enable the extension in the Extension Manager.
+Non-browser clients should normally omit `Origin`. Browser clients need an exact entry in `allowedOrigins`.
+
+**A tool is missing from `tools/list`**
+
+Enable it in Tool Management. Dangerous tools are disabled by default.
+
+**`Scene not ready`**
+
+Open a scene in Cocos Creator first.
+
+**Source changes are not applied**
+
+Run `npm run build`, then reload the extension.
 
 ## License
 
