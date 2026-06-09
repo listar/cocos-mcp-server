@@ -22,6 +22,8 @@ npm run build        # Compile source/ to dist/
 npm run watch        # Watch TypeScript compilation
 npm test             # Build and run node:test regression tests
 npm run test:editor  # Run the standalone Cocos 3.8.8 editor smoke
+npm run test:package # Verify the installable npm release artifact
+npm run install:global # Link this checkout into the Cocos 3.8.8 global extension directory
 npm audit            # Check dependency advisories
 ```
 

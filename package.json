@@ -8,8 +8,18 @@
         "build": "tsc",
         "watch": "tsc -w",
         "test": "npm run build && node --test test/*.test.js",
-        "test:editor": "npm run build && node scripts/editor-smoke.js"
+        "test:editor": "npm run build && node scripts/editor-smoke.js",
+        "test:package": "npm run build && node scripts/verify-package.js",
+        "install:global": "npm run build && node scripts/install-global.js",
+        "prepack": "npm run build"
     },
+    "files": [
+        "dist/**",
+        "static/**",
+        "i18n/**",
+        "scripts/install-global.js",
+        "README.EN.md"
+    ],
     "description": "i18n:cocos-mcp-server.description",
     "main": "./dist/main.js",
     "dependencies": {

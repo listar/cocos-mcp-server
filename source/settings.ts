@@ -96,24 +96,37 @@ function getToolManagerSettingsPath(): string {
 }
 
 export function readSettings(): MCPServerSettings {
+    let filePath = '';
+    let rawSettings: Partial<MCPServerSettings> = {};
     try {
         ensureSettingsDir();
-        const filePath = getSettingsPath();
-        let rawSettings: Partial<MCPServerSettings> = {};
+        filePath = getSettingsPath();
         if (fs.existsSync(filePath)) {
             const content = fs.readFileSync(filePath, 'utf8');
-            rawSettings = JSON.parse(content);
+            const parsed = JSON.parse(content);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                throw new Error('Server settings must be an object');
+            }
+            rawSettings = parsed;
         }
-        const settings = normalizeSettings(rawSettings);
+    } catch (e) {
+        errorLog('Settings', 'Failed to read server settings', e);
+    }
+
+    const settings = normalizeSettings(rawSettings);
+    try {
+        if (!filePath) {
+            ensureSettingsDir();
+            filePath = getSettingsPath();
+        }
         const serialized = JSON.stringify(settings, null, 2);
         if (!fs.existsSync(filePath) || fs.readFileSync(filePath, 'utf8') !== serialized) {
             fs.writeFileSync(filePath, serialized);
         }
-        return settings;
     } catch (e) {
-        errorLog('Settings', 'Failed to read server settings', e);
+        errorLog('Settings', 'Failed to persist normalized server settings', e);
     }
-    return normalizeSettings({});
+    return settings;
 }
 
 export function saveSettings(settings: MCPServerSettings): void {

@@ -31,26 +31,36 @@ The current implementation provides **153 tools in 14 categories**, uses the off
 
 ## Installation
 
-Place the repository in a project-level or global extension directory:
+For a project-level install, place the repository in:
 
 ```text
 {cocos-project}/extensions/cocos-mcp-server/
 ```
 
-```text
-~/.CocosCreator/extensions/cocos-mcp-server/
-```
-
-For a source checkout, install dependencies and compile:
+For a global development install, run:
 
 ```bash
 npm install
-npm run build
+npm run install:global
 ```
 
-Then enable `cocos-mcp-server` from **Extension → Extension Manager** in Cocos Creator.
+This builds the extension and links the checkout into the directory actually scanned by Cocos Creator 3.8.8:
 
-> The release workflow does not yet produce a finalized install bundle containing `dist/`. Source installations must be built first. See [TODO.md](TODO.md).
+```text
+~/.CocosCreator/builtin-extensions/3.8.8/cocos-mcp-server/
+```
+
+To target another supported version explicitly:
+
+```bash
+npm run install:global -- --version 3.8.8
+```
+
+Restart Cocos Creator after installing or rebuilding. A successful load adds **Extension → Cocos MCP Server → Open MCP Panel**.
+
+The npm artifact produced by `npm pack` includes `dist/`, static assets, and i18n while excluding source files, tests, and local agent instructions. Run `npm run test:package` to pack, clean-install, and load the extension entry point.
+
+> Cocos Creator 3.8.8 does not scan the legacy `~/.CocosCreator/extensions/` directory. Use the versioned directory above or `npm run install:global`.
 
 ## Quick Start
 
@@ -186,6 +196,8 @@ npm run build       # TypeScript -> dist/
 npm run watch       # Watch compilation
 npm test            # Build and run Node.js regression tests
 npm run test:editor # Isolated real-editor smoke; concurrent Cocos instances are rejected by default
+npm run test:package # Verify package contents, clean installation, and runtime dependencies
+npm run install:global # Build and link into the Cocos 3.8.8 global extension directory
 npm audit           # Dependency security audit
 ```
 

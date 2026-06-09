@@ -2,7 +2,16 @@
 
 import { readFileSync } from 'fs-extra';
 import { join } from 'path';
-import { createApp, App, defineComponent, ref, computed, onMounted, watch } from 'vue';
+import {
+    createApp,
+    App,
+    defineComponent,
+    ref,
+    computed,
+    onMounted,
+    onUnmounted,
+    watch
+} from 'vue';
 import { errorLog } from '../../logger';
 
 const panelDataMap = new WeakMap<any, App>();
@@ -90,8 +99,8 @@ module.exports = Editor.Panel.define({
                 const toolCategories = ref<string[]>([]);
 
                 const statusClass = computed(() => ({
-                    'status-running': serverRunning.value,
-                    'status-stopped': !serverRunning.value
+                    running: serverRunning.value,
+                    stopped: !serverRunning.value
                 }));
 
                 const totalTools = computed(() => availableTools.value.length);
@@ -105,7 +114,28 @@ module.exports = Editor.Panel.define({
                     }
                 };
 
+                const applyServerStatus = (status: any) => {
+                    if (!status) return;
+                    serverRunning.value = Boolean(status.running);
+                    serverStatusText.value = status.running ? 'Running' : 'Stopped';
+                    connectedClients.value = status.clients ?? 0;
+                    httpUrl.value = status.running
+                        ? `http://127.0.0.1:${status.port}/mcp`
+                        : '';
+                };
+
+                const refreshServerStatus = async () => {
+                    const status = await Editor.Message.request(
+                        'cocos-mcp-server',
+                        'get-server-status'
+                    );
+                    applyServerStatus(status);
+                    return status;
+                };
+
                 const toggleServer = async () => {
+                    if (isProcessing.value) return;
+                    isProcessing.value = true;
                     try {
                         if (serverRunning.value) {
                             await Editor.Message.request('cocos-mcp-server', 'stop-server');
@@ -126,12 +156,17 @@ module.exports = Editor.Panel.define({
                             await Editor.Message.request('cocos-mcp-server', 'update-settings', currentSettings);
                             await Editor.Message.request('cocos-mcp-server', 'start-server');
                         }
+                        await refreshServerStatus();
                     } catch (error) {
                         errorLog('MCP Panel', 'Failed to toggle server', error);
+                    } finally {
+                        isProcessing.value = false;
                     }
                 };
 
                 const saveSettings = async () => {
+                    if (isProcessing.value) return;
+                    isProcessing.value = true;
                     try {
                         const settingsData = {
                             port: settings.value.port,
@@ -147,9 +182,12 @@ module.exports = Editor.Panel.define({
                             enableRestApi: settings.value.enableRestApi
                         };
                         await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
+                        await refreshServerStatus();
                         settingsChanged.value = false;
                     } catch (error) {
                         errorLog('MCP Panel', 'Failed to save settings', error);
+                    } finally {
+                        isProcessing.value = false;
                     }
                 };
 
@@ -251,13 +289,19 @@ module.exports = Editor.Panel.define({
                     return CATEGORY_DISPLAY_NAMES[category] ?? category;
                 };
 
-                watch(settings, () => { settingsChanged.value = true; }, { deep: true });
+                watch(
+                    settings,
+                    () => { settingsChanged.value = true; },
+                    { deep: true, flush: 'sync' }
+                );
+
+                let statusPollTimer: ReturnType<typeof setInterval> | undefined;
 
                 onMounted(async () => {
                     await loadToolManagerState();
 
                     try {
-                        const status = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
+                        const status = await refreshServerStatus();
                         if (status?.settings) {
                             settings.value = {
                                 port: status.settings.port ?? 3000,
@@ -278,20 +322,17 @@ module.exports = Editor.Panel.define({
                         errorLog('MCP Panel', 'Failed to load server settings', error);
                     }
 
-                    setInterval(async () => {
+                    statusPollTimer = setInterval(async () => {
                         try {
-                            const result = await Editor.Message.request('cocos-mcp-server', 'get-server-status');
-                            if (result) {
-                                serverRunning.value = result.running;
-                                serverStatusText.value = result.running ? 'Running' : 'Stopped';
-                                connectedClients.value = result.clients ?? 0;
-                                httpUrl.value = result.running ? `http://127.0.0.1:${result.port}/mcp` : '';
-                                isProcessing.value = false;
-                            }
+                            await refreshServerStatus();
                         } catch (error) {
                             errorLog('MCP Panel', 'Failed to poll server status', error);
                         }
                     }, 2000);
+                });
+
+                onUnmounted(() => {
+                    if (statusPollTimer) clearInterval(statusPollTimer);
                 });
 
                 return {

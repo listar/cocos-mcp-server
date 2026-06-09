@@ -81,7 +81,7 @@
             </ui-prop>
             <ui-prop>
                 <ui-label slot="label">访问令牌</ui-label>
-                <ui-input slot="content" :value="settings.authToken" readonly>
+                <ui-input slot="content" :value="settings.authToken" type="password" readonly>
                     <ui-button slot="suffix" @click="copyToken">复制</ui-button>
                 </ui-input>
             </ui-prop>
@@ -100,7 +100,7 @@
         </section>
 
         <footer>
-            <ui-button @click="saveSettings" :disabled="!settingsChanged">保存设置</ui-button>
+            <ui-button @click="saveSettings" :disabled="!settingsChanged || isProcessing">保存设置</ui-button>
         </footer>
     </div>
     

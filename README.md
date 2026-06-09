@@ -31,26 +31,36 @@
 
 ## 安装与构建
 
-将仓库放入项目级或全局扩展目录：
+项目级安装可将仓库放入：
 
 ```text
 {cocos-project}/extensions/cocos-mcp-server/
 ```
 
-```text
-~/.CocosCreator/extensions/cocos-mcp-server/
-```
-
-从源码安装后执行：
+全局开发安装推荐在仓库中运行：
 
 ```bash
 npm install
-npm run build
+npm run install:global
 ```
 
-然后在 Cocos Creator 的 **扩展 → 扩展管理器** 中启用 `cocos-mcp-server`。
+该命令会构建扩展，并将当前仓库链接到 Cocos Creator 3.8.8 实际扫描的目录：
 
-> 当前发布流程尚未固化为包含 `dist/` 的安装包。从源码安装时必须先构建，详见 [TODO.md](TODO.md)。
+```text
+~/.CocosCreator/builtin-extensions/3.8.8/cocos-mcp-server/
+```
+
+手动安装到其他受支持版本时可传入版本号：
+
+```bash
+npm run install:global -- --version 3.8.8
+```
+
+安装或重新构建后需要重启 Cocos Creator。扩展加载成功后，菜单中会出现 **扩展 → Cocos MCP Server → 打开 MCP 面板**。
+
+`npm pack` 生成的 npm 发布包已包含 `dist/`、静态资源和 i18n，不包含源码、测试和本地代理说明。运行 `npm run test:package` 可执行打包、临时安装和入口加载验证。
+
+> Cocos 3.8.8 不扫描旧目录 `~/.CocosCreator/extensions/`。全局扩展必须使用上面的版本级目录，或运行 `npm run install:global`。
 
 ## 快速开始
 
@@ -185,6 +195,8 @@ npm run build       # TypeScript -> dist/
 npm run watch       # 监听编译
 npm test            # 构建并运行 Node.js 回归测试
 npm run test:editor # 创建隔离项目并运行真实编辑器冒烟；默认拒绝与其他 Cocos 实例并行
+npm run test:package # 验证发布包内容、临时安装和运行时依赖
+npm run install:global # 构建并链接到 Cocos 3.8.8 全局扩展目录
 npm audit           # 依赖安全审计
 ```
 

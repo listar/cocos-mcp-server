@@ -14,7 +14,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
 
     async startServer() {
         if (!mcpServer) {
-            console.warn('[MCP] mcpServer is not initialized');
+            errorLog('MCP', 'Server is not initialized');
             return;
         }
         mcpServer.updateEnabledTools(toolManager.getEnabledTools());
@@ -23,7 +23,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
 
     async stopServer() {
         if (!mcpServer) {
-            console.warn('[MCP] mcpServer is not initialized');
+            errorLog('MCP', 'Server is not initialized');
             return;
         }
         await mcpServer.stop();

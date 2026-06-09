@@ -103,10 +103,10 @@ Done when: normal operation is quiet and debug logging has a documented redactio
 
 ### P2-01 Produce an installable release artifact
 
-- [ ] Define whether releases are npm packages, Cocos extension ZIP files, or both.
-- [ ] Ensure the artifact includes `dist/`, `static/`, `i18n/`, and the required manifest files.
-- [ ] Exclude source-only files, tests, local agent instructions, and project settings where appropriate.
-- [ ] Add a clean-install verification step.
+- [x] Use an npm package as the initial release artifact; a dedicated Cocos ZIP can be added later if distribution requires it.
+- [x] Ensure the artifact includes `dist/`, `static/`, `i18n/`, the global installer, and required manifest files.
+- [x] Exclude source-only files, tests, local agent instructions, and project settings.
+- [x] Add `npm run test:package` to pack, install into a temporary project, resolve runtime dependencies, and load the extension entry point.
 
 Done when: a user can install a release without running TypeScript locally.
 
