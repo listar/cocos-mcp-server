@@ -17,6 +17,7 @@ function createSettings(overrides = {}) {
         requestBodyLimitBytes: 16 * 1024,
         toolExecutionTimeoutMs: 2000,
         enableRestApi: false,
+        hierarchyFirst: true,
         ...overrides
     };
 }
@@ -118,6 +119,9 @@ test('MCP HTTP endpoint enforces security and protocol behavior', async t => {
     assert.ok(sessionId);
     const initializeBody = await initialize.json();
     assert.equal(initializeBody.result.protocolVersion, '2025-11-25');
+    assert.match(initializeBody.result.instructions, /Static hierarchy authoring is enabled/);
+    assert.match(initializeBody.result.instructions, /single, explicit, stable UI/);
+    assert.match(initializeBody.result.instructions, /runtime\/dynamic UI/);
 
     const initialized = await postMcp(baseUrl, {
         jsonrpc: '2.0',
@@ -189,6 +193,28 @@ test('dangerous tools require explicit confirmation in their schema', () => {
     assert.equal(tool.annotations.destructiveHint, true);
     assert.ok(tool.inputSchema.required.includes('confirm'));
     assert.equal(tool.inputSchema.properties.confirm.const, true);
+});
+
+test('hierarchy-first mode prioritizes editor authoring tools and demotes scripts', () => {
+    const server = new MCPServer(createSettings());
+    const tools = server.getAvailableTools();
+    const names = tools.map(tool => tool.name);
+
+    assert.ok(names.indexOf('scene_get_scene_hierarchy') < names.indexOf('node_create_node'));
+    assert.ok(names.indexOf('node_create_node') < names.indexOf('debug_execute_script'));
+    assert.ok(names.indexOf('component_add_component') < names.indexOf('sceneAdvanced_execute_scene_script'));
+    assert.match(
+        tools.find(tool => tool.name === 'node_create_node').description,
+        /static or one-off editor-authored/
+    );
+    assert.match(
+        tools.find(tool => tool.name === 'component_attach_script').description,
+        /dynamically generated UI/
+    );
+    assert.match(
+        tools.find(tool => tool.name === 'debug_execute_script').description,
+        /LAST RESORT/
+    );
 });
 
 test('session deletion and maximum session count are deterministic', async t => {

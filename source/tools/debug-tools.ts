@@ -34,7 +34,7 @@ export class DebugTools implements ToolExecutor {
             },
             {
                 name: 'execute_script',
-                description: 'Execute JavaScript in scene context',
+                description: 'LAST RESORT: execute arbitrary JavaScript in scene context only when explicitly requested, for probes/maintenance, or when dedicated MCP tools cannot express the operation. For production dynamic UI, prefer project scripts/custom components instead of ad hoc eval; for static UI, use hierarchy tools.',
                 inputSchema: {
                     type: 'object',
                     properties: {

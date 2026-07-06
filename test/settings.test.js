@@ -43,11 +43,14 @@ test('server settings normalize unsafe origins and numeric limits', t => {
         port: 80,
         allowedOrigins: ['*', ' https://example.test ', 'https://example.test'],
         maxConnections: 1000,
-        authToken: 'short'
+        authToken: 'short',
+        hierarchyFirst: false
     });
 
     assert.equal(settings.port, 1024);
     assert.deepEqual(settings.allowedOrigins, ['https://example.test']);
     assert.equal(settings.maxConnections, 100);
     assert.equal(settings.authToken.length, 48);
+    assert.equal(settings.hierarchyFirst, false);
+    assert.equal(normalizeSettings({}).hierarchyFirst, true);
 });

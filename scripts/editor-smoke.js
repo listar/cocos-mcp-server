@@ -171,7 +171,8 @@ function writeServerSettings(projectPath, port, authToken) {
         authToken,
         requestBodyLimitBytes: 1024 * 1024,
         toolExecutionTimeoutMs: 60_000,
-        enableRestApi: false
+        enableRestApi: false,
+        hierarchyFirst: true
     }, null, 2));
 }
 

@@ -126,6 +126,7 @@ The server uses stateful MCP transports. Initialization returns `MCP-Session-Id`
 - `requestBodyLimitBytes`
 - `toolExecutionTimeoutMs`
 - `enableRestApi`
+- `hierarchyFirst`
 
 `{project}/settings/tool-manager.json` stores named tool configurations, schema versions, and security migration state.
 

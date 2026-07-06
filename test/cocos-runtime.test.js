@@ -29,7 +29,8 @@ test('MCP SDK initializes inside the supported Cocos 3.8.8 Electron runtime', t 
             authToken: token,
             requestBodyLimitBytes: 65536,
             toolExecutionTimeoutMs: 2000,
-            enableRestApi: false
+            enableRestApi: false,
+            hierarchyFirst: true
         });
         (async () => {
             await server.start();

@@ -35,6 +35,7 @@ interface ServerSettings {
     requestBodyLimitBytes: number;
     toolExecutionTimeoutMs: number;
     enableRestApi: boolean;
+    hierarchyFirst: boolean;
 }
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
@@ -92,7 +93,8 @@ module.exports = Editor.Panel.define({
                     allowedOrigins: '',
                     requestBodyLimitBytes: 1024 * 1024,
                     toolExecutionTimeoutMs: 30000,
-                    enableRestApi: false
+                    enableRestApi: false,
+                    hierarchyFirst: true
                 });
 
                 const availableTools = ref<ToolConfig[]>([]);
@@ -151,7 +153,8 @@ module.exports = Editor.Panel.define({
                                 allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
                                 requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
                                 toolExecutionTimeoutMs: settings.value.toolExecutionTimeoutMs,
-                                enableRestApi: settings.value.enableRestApi
+                                enableRestApi: settings.value.enableRestApi,
+                                hierarchyFirst: settings.value.hierarchyFirst
                             };
                             await Editor.Message.request('cocos-mcp-server', 'update-settings', currentSettings);
                             await Editor.Message.request('cocos-mcp-server', 'start-server');
@@ -179,7 +182,8 @@ module.exports = Editor.Panel.define({
                             allowedOrigins: parseAllowedOrigins(settings.value.allowedOrigins),
                             requestBodyLimitBytes: settings.value.requestBodyLimitBytes,
                             toolExecutionTimeoutMs: settings.value.toolExecutionTimeoutMs,
-                            enableRestApi: settings.value.enableRestApi
+                            enableRestApi: settings.value.enableRestApi,
+                            hierarchyFirst: settings.value.hierarchyFirst
                         };
                         await Editor.Message.request('cocos-mcp-server', 'update-settings', settingsData);
                         await refreshServerStatus();
@@ -314,7 +318,8 @@ module.exports = Editor.Panel.define({
                                 allowedOrigins: (status.settings.allowedOrigins ?? []).join(', '),
                                 requestBodyLimitBytes: status.settings.requestBodyLimitBytes ?? 1024 * 1024,
                                 toolExecutionTimeoutMs: status.settings.toolExecutionTimeoutMs ?? 30000,
-                                enableRestApi: status.settings.enableRestApi ?? false
+                                enableRestApi: status.settings.enableRestApi ?? false,
+                                hierarchyFirst: status.settings.hierarchyFirst !== false
                             };
                             settingsChanged.value = false;
                         }

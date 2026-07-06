@@ -10,6 +10,7 @@ export interface MCPServerSettings {
     requestBodyLimitBytes: number;
     toolExecutionTimeoutMs: number;
     enableRestApi: boolean;
+    hierarchyFirst: boolean;
 }
 
 export interface ServerStatus {

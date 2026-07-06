@@ -15,7 +15,8 @@ export const DEFAULT_SETTINGS: MCPServerSettings = {
     authToken: '',
     requestBodyLimitBytes: 1024 * 1024,
     toolExecutionTimeoutMs: 30000,
-    enableRestApi: false
+    enableRestApi: false,
+    hierarchyFirst: true
 };
 
 export const DEFAULT_TOOL_MANAGER_SETTINGS: ToolManagerSettings = {
@@ -72,7 +73,8 @@ export function normalizeSettings(
             1000,
             5 * 60 * 1000
         ),
-        enableRestApi: Boolean(merged.enableRestApi)
+        enableRestApi: Boolean(merged.enableRestApi),
+        hierarchyFirst: merged.hierarchyFirst !== false
     };
 }
 

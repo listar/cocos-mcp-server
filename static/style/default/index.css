@@ -112,6 +112,15 @@ ui-prop {
     margin-bottom: 10px;
 }
 
+.setting-with-help {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-normal-text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
 /* 工具管理器样式 */
 .tool-manager {
     display: flex;

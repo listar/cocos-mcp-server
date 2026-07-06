@@ -31,6 +31,46 @@ import { debugLog, setDebugLogging } from './logger';
 
 const SERVER_VERSION = '1.0.0';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const BASE_SERVER_INSTRUCTIONS = [
+    'Use read-only query tools before mutation tools.',
+    'High-risk tools require confirm=true.'
+].join(' ');
+const HIERARCHY_FIRST_INSTRUCTIONS = [
+    'Static hierarchy authoring is enabled.',
+    'For single, explicit, stable UI or scene elements that users need to read and manage later,',
+    'inspect the current scene with scene_get_current_scene, scene_get_scene_hierarchy, or node query tools,',
+    'then create and modify persistent content with node_*, component_*, and prefab_* tools',
+    'so the result appears in the Cocos Creator Hierarchy and can be saved in the scene.',
+    'For repeated, data-driven, pooled, or runtime/dynamic UI and scene content, prefer project scripts,',
+    'custom components, prefab templates, and stable hierarchy containers instead of expanding every instance',
+    'as editor-authored nodes.',
+    'Do not use debug_execute_script or sceneAdvanced_execute_scene_script to permanently author ordinary static hierarchy;',
+    'use them only for explicit probes, maintenance, or operations dedicated tools cannot express.',
+    'After persistent hierarchy mutations, verify the affected nodes and save the scene when appropriate.'
+].join(' ');
+
+const HIERARCHY_TOOL_PRIORITY = new Map<string, number>([
+    ['scene_get_current_scene', 0],
+    ['scene_get_scene_hierarchy', 1],
+    ['node_get_all_nodes', 2],
+    ['node_find_node_by_name', 3],
+    ['node_find_nodes', 4],
+    ['node_get_node_info', 5],
+    ['node_create_node', 10],
+    ['prefab_instantiate_prefab', 11],
+    ['component_add_component', 12],
+    ['node_set_node_transform', 13],
+    ['node_set_node_property', 14],
+    ['component_set_component_property', 15],
+    ['node_move_node', 16],
+    ['node_duplicate_node', 17],
+    ['component_get_components', 20],
+    ['component_get_component_info', 21],
+    ['scene_save_scene', 30],
+    ['debug_execute_script', 10_000],
+    ['sceneAdvanced_execute_component_method', 10_001],
+    ['sceneAdvanced_execute_scene_script', 10_002]
+]);
 
 const TOOL_OUTPUT_SCHEMA = {
     type: 'object',
@@ -295,7 +335,7 @@ export class MCPServer {
                 capabilities: {
                     tools: { listChanged: true }
                 },
-                instructions: 'Use read-only query tools before mutation tools. High-risk tools require confirm=true.'
+                instructions: this.getServerInstructions()
             }
         );
 
@@ -339,9 +379,29 @@ export class MCPServer {
     }
 
     private rebuildToolsList(): void {
-        this.toolsList = Array.from(this.registeredTools.entries())
+        const tools = Array.from(this.registeredTools.entries())
             .filter(([name]) => this.enabledToolNames === null || this.enabledToolNames.has(name))
-            .map(([, tool]) => tool.definition);
+            .map(([name, tool], index) => ({ name, tool: tool.definition, index }));
+
+        if (this.settings.hierarchyFirst !== false) {
+            tools.sort((a, b) => {
+                const priorityDifference = this.getToolPriority(a.name) - this.getToolPriority(b.name);
+                return priorityDifference || a.index - b.index;
+            });
+        }
+
+        this.toolsList = tools.map(item => item.tool);
+    }
+
+    private getToolPriority(toolName: string): number {
+        return HIERARCHY_TOOL_PRIORITY.get(toolName) ?? 1000;
+    }
+
+    private getServerInstructions(): string {
+        if (this.settings.hierarchyFirst === false) {
+            return BASE_SERVER_INSTRUCTIONS;
+        }
+        return `${HIERARCHY_FIRST_INSTRUCTIONS} ${BASE_SERVER_INSTRUCTIONS}`;
     }
 
     private getValidator(toolName: string, schema: object): ValidateFunction {

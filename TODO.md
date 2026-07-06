@@ -163,6 +163,7 @@ Done when: each release has a versioned artifact, migration notes, and reproduci
 
 ## P3 Product Enhancements
 
+- [x] Add a default-on hierarchy-first authoring policy through MCP instructions, tool ordering, descriptions, and panel settings.
 - [ ] Add named tool presets such as Read Only, Scene Editing, Asset Management, and Full Access.
 - [ ] Consider MCP resources for scene hierarchy, logs, and project metadata.
 - [ ] Consider MCP prompts for common scene-building workflows.

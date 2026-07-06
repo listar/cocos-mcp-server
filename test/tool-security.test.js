@@ -14,7 +14,8 @@ test('every registered tool has explicit security annotations', () => {
         authToken: 'security-test-token-long-enough',
         requestBodyLimitBytes: 16 * 1024,
         toolExecutionTimeoutMs: 1000,
-        enableRestApi: false
+        enableRestApi: false,
+        hierarchyFirst: true
     });
     const tools = server.getAvailableTools();
 

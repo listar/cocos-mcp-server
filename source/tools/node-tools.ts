@@ -8,7 +8,7 @@ export class NodeTools implements ToolExecutor {
         return [
             {
                 name: 'create_node',
-                description: 'Create a new node in the scene. Supports creating empty nodes, nodes with components, or instantiating from assets (prefabs, etc.). IMPORTANT: You should always provide parentUuid to specify where to create the node.',
+                description: 'PREFERRED for static or one-off editor-authored UI/scene nodes: create a persistent node that appears in the Cocos Creator Hierarchy. For repeated, data-driven, or runtime-generated content, prefer scripts/custom components with prefab templates and stable hierarchy containers. Always provide parentUuid when possible.',
                 inputSchema: {
                     type: 'object',
                     properties: {
@@ -18,7 +18,7 @@ export class NodeTools implements ToolExecutor {
                         },
                         parentUuid: {
                             type: 'string',
-                            description: 'Parent node UUID. STRONGLY RECOMMENDED: Always provide this parameter. Use get_current_scene or get_all_nodes to find parent UUIDs. If not provided, node will be created at scene root.'
+                            description: 'Parent node UUID. STRONGLY RECOMMENDED: Always provide this parameter. Use scene_get_scene_hierarchy or node_get_all_nodes to find parent UUIDs. If omitted, the node is created at the scene root.'
                         },
                         nodeType: {
                             type: 'string',

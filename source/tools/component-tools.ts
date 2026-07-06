@@ -6,7 +6,7 @@ export class ComponentTools implements ToolExecutor {
         return [
             {
                 name: 'add_component',
-                description: 'Add a component to a specific node. IMPORTANT: You must provide the nodeUuid parameter to specify which node to add the component to.',
+                description: 'PREFERRED for static editor-time authoring: add a component directly to a hierarchy node that should remain readable in the Cocos Creator Hierarchy. For repeated or data-driven runtime behavior, use custom scripts/components on stable containers or prefab templates. The exact nodeUuid is required.',
                 inputSchema: {
                     type: 'object',
                     properties: {
@@ -149,7 +149,7 @@ export class ComponentTools implements ToolExecutor {
             },
             {
                 name: 'attach_script',
-                description: 'Attach a script component to a node',
+                description: 'Attach an existing script component when runtime behavior is needed, including repeated, data-driven, or dynamically generated UI. Keep single explicit UI/layout nodes in the hierarchy when they are easier to read and manage.',
                 inputSchema: {
                     type: 'object',
                     properties: {

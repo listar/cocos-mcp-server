@@ -32,7 +32,7 @@ export class PrefabTools implements ToolExecutor {
             },
             {
                 name: 'instantiate_prefab',
-                description: 'Instantiate a prefab in the scene and verify the created node',
+                description: 'PREFERRED for static or one-off editor-time prefab placement: instantiate a prefab as a persistent node in the Cocos Creator Hierarchy and verify the result. For repeated runtime instances, prefer script-driven prefab instantiation from a stable container.',
                 inputSchema: {
                     type: 'object',
                     properties: {

@@ -164,6 +164,13 @@ MCP 暴露的完整工具名格式为 `<category>_<tool>`，例如 `node_create_
 | `requestBodyLimitBytes` | `1048576` | 最大请求体，默认 1 MiB |
 | `toolExecutionTimeoutMs` | `30000` | 单个工具执行超时 |
 | `enableRestApi` | `false` | 是否启用 `/api/*` |
+| `hierarchyFirst` | `true` | 单个明确 UI/固定布局优先写入层级；批量、数据驱动或运行期生成优先脚本、组件和 Prefab 模板 |
+
+### 静态 UI 层级优先
+
+默认启用 `hierarchyFirst`。MCP 初始化指引会要求客户端先判断内容类型：单个明确 UI、固定布局、需要后续阅读和手动管理的场景内容，优先查询当前层级后使用 `node_*`、`component_*` 和 `prefab_*` 工具创建或修改节点。`node_create_node` 创建的节点会直接出现在 Cocos Creator 层级管理器中，并可随场景保存。
+
+多个重复项、数据驱动列表、对象池、运行期动态生成 UI 或场景内容，优先使用项目脚本、自定义组件和 Prefab 模板，只把稳定容器或模板节点保留在层级里。MCP 协议没有标准的工具优先级字段，因此该策略通过服务端指引、`tools/list` 排序和工具描述共同实现。任意脚本执行工具仍默认禁用；即使手动启用，也被标记为临时探查或维护兜底，不作为正式动态 UI 代码的首选。客户端需要重新连接 MCP 才能读取更新后的初始化指引。
 
 ## 架构
 

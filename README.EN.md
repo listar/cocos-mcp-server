@@ -165,6 +165,13 @@ Settings are stored under `{project}/settings/`:
 | `requestBodyLimitBytes` | `1048576` | Maximum request body, 1 MiB by default |
 | `toolExecutionTimeoutMs` | `30000` | Per-tool execution timeout |
 | `enableRestApi` | `false` | Enable `/api/*` |
+| `hierarchyFirst` | `true` | Prefer hierarchy tools for single explicit UI/layout authoring; prefer scripts, components, and prefab templates for repeated, data-driven, or runtime content |
+
+### Static UI hierarchy-first authoring
+
+`hierarchyFirst` is enabled by default. MCP initialization instructions tell clients to classify the content first: for single explicit UI, fixed layouts, and scene content that users need to read and manage later, inspect the current hierarchy and prefer `node_*`, `component_*`, and `prefab_*` tools. Nodes created by `node_create_node` appear directly in the Cocos Creator Hierarchy and can be saved with the scene.
+
+For repeated items, data-driven lists, pools, or runtime-generated UI/scene content, prefer project scripts, custom components, and prefab templates, keeping only stable containers or templates in the hierarchy. MCP has no standard tool-priority field, so this policy combines server instructions, `tools/list` ordering, and explicit tool descriptions. Arbitrary script tools remain disabled by default and are marked as a probe or maintenance fallback if manually enabled, not as the preferred way to implement production dynamic UI. Clients must reconnect to receive updated initialization instructions.
 
 ## Architecture
 

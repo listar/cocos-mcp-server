@@ -47,6 +47,13 @@
                 <ui-checkbox slot="content" v-model="settings.debugLog"></ui-checkbox>
             </ui-prop>
             <ui-prop>
+                <ui-label slot="label">静态 UI 层级优先</ui-label>
+                <div slot="content" class="setting-with-help">
+                    <ui-checkbox v-model="settings.hierarchyFirst"></ui-checkbox>
+                    <span>单个明确 UI/固定布局走层级；批量、数据驱动或运行期生成仍建议脚本、组件和 Prefab 模板。</span>
+                </div>
+            </ui-prop>
+            <ui-prop>
                 <ui-label slot="label">最大并发请求</ui-label>
                 <ui-num-input slot="content" v-model="settings.maxConnections" :min="1" :max="100" :step="1">
                 </ui-num-input>
@@ -81,7 +88,7 @@
             </ui-prop>
             <ui-prop>
                 <ui-label slot="label">访问令牌</ui-label>
-                <ui-input slot="content" :value="settings.authToken" type="password" readonly>
+                <ui-input slot="content" value="********" readonly>
                     <ui-button slot="suffix" @click="copyToken">复制</ui-button>
                 </ui-input>
             </ui-prop>

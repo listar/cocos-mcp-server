@@ -200,7 +200,7 @@ export class SceneAdvancedTools implements ToolExecutor {
             },
             {
                 name: 'execute_scene_script',
-                description: 'Execute scene script method',
+                description: 'LAST RESORT: execute a registered scene-script method only when explicitly requested or no dedicated MCP tool can perform the operation. Do not use it for normal static hierarchy authoring; use project scripts/custom components for real runtime generation.',
                 inputSchema: {
                     type: 'object',
                     properties: {
