@@ -23,6 +23,7 @@
                     <ui-label slot="content">{{ connectedClients }}</ui-label>
                 </ui-prop>
             </div>
+            <p v-if="serverError" class="server-error" role="alert">{{ serverError }}</p>
         </section>
 
         <section class="server-controls">

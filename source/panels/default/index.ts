@@ -77,6 +77,7 @@ module.exports = Editor.Panel.define({
                 const activeTab = ref('server');
                 const serverRunning = ref(false);
                 const serverStatusText = ref('Stopped');
+                const serverError = ref('');
                 const connectedClients = ref(0);
                 const httpUrl = ref('');
                 const isProcessing = ref(false);
@@ -120,6 +121,9 @@ module.exports = Editor.Panel.define({
                     if (!status) return;
                     serverRunning.value = Boolean(status.running);
                     serverStatusText.value = status.running ? 'Running' : 'Stopped';
+                    if (typeof status.error === 'string' || status.running) {
+                        serverError.value = status.error ?? '';
+                    }
                     connectedClients.value = status.clients ?? 0;
                     httpUrl.value = status.running
                         ? `http://127.0.0.1:${status.port}/mcp`
@@ -138,9 +142,10 @@ module.exports = Editor.Panel.define({
                 const toggleServer = async () => {
                     if (isProcessing.value) return;
                     isProcessing.value = true;
+                    serverError.value = '';
                     try {
                         if (serverRunning.value) {
-                            await Editor.Message.request('cocos-mcp-server', 'stop-server');
+                            applyServerStatus(await Editor.Message.request('cocos-mcp-server', 'stop-server'));
                         } else {
                             const currentSettings = {
                                 port: settings.value.port,
@@ -157,10 +162,13 @@ module.exports = Editor.Panel.define({
                                 hierarchyFirst: settings.value.hierarchyFirst
                             };
                             await Editor.Message.request('cocos-mcp-server', 'update-settings', currentSettings);
-                            await Editor.Message.request('cocos-mcp-server', 'start-server');
+                            applyServerStatus(await Editor.Message.request('cocos-mcp-server', 'start-server'));
                         }
                         await refreshServerStatus();
-                    } catch (error) {
+                    } catch (error: any) {
+                        serverError.value = /EADDRINUSE/.test(String(error?.message))
+                            ? `端口 ${settings.value.port} 已被占用，请更换端口或停止占用它的服务。`
+                            : '启动或停止请求失败，请重新加载扩展后重试。';
                         errorLog('MCP Panel', 'Failed to toggle server', error);
                     } finally {
                         isProcessing.value = false;
@@ -344,6 +352,7 @@ module.exports = Editor.Panel.define({
                     activeTab,
                     serverRunning,
                     serverStatusText,
+                    serverError,
                     connectedClients,
                     httpUrl,
                     isProcessing,

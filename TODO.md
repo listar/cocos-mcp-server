@@ -1,6 +1,6 @@
 # Upgrade TODO
 
-Last reviewed: June 7, 2026
+Last reviewed: October 13, 2026
 
 This roadmap tracks work after the security and protocol stabilization pass. Priorities are ordered by user impact and engineering risk.
 
@@ -112,11 +112,11 @@ Done when: a user can install a release without running TypeScript locally.
 
 ### P2-02 Add continuous integration
 
-- [ ] Run `npm ci`, `npm test`, `npm audit`, and `git diff --check`.
-- [ ] Verify the release artifact contents.
-- [ ] Cache dependencies without committing generated output.
+- [x] Run `npm ci`, `npm test`, `npm audit`, and `git diff --check`.
+- [x] Verify the release artifact contents.
+- [x] Cache dependencies without committing generated output.
 
-Done when: pull requests cannot merge with build, test, audit, or packaging failures.
+CI is implemented for Node.js 20/22. Repository administrators must still require the Verify checks in branch protection before merge blocking is enforced.
 
 ### P2-03 Split oversized tool modules
 
@@ -155,9 +155,9 @@ Done when: the panel is fully usable in Chinese and English and clearly communic
 
 ### P2-07 Establish release discipline
 
-- [ ] Add `CHANGELOG.md`.
-- [ ] Choose semantic versioning rules for protocol, tools, and settings migrations.
-- [ ] Add a release checklist and tag process.
+- [x] Add `CHANGELOG.md`.
+- [x] Choose semantic versioning rules for protocol, tools, and settings migrations.
+- [x] Add a release checklist and tag process.
 
 Done when: each release has a versioned artifact, migration notes, and reproducible verification.
 

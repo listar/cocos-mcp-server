@@ -355,3 +355,69 @@ test('REST API can be enabled and shutdown closes an open SSE request', async ()
     ]);
     assert.equal(server.getStatus().running, false);
 });
+
+test('allowed browser clients can read session headers and the manifest version', async t => {
+    const server = new MCPServer(createSettings());
+    await server.start();
+    t.after(() => server.stop());
+    const response = await postMcp(`http://127.0.0.1:${server.getStatus().port}`, {
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: {
+            protocolVersion: '2025-11-25', capabilities: {},
+            clientInfo: { name: 'browser', version: '1' }
+        }
+    }, { Origin: 'https://allowed.example' });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('access-control-expose-headers'), /MCP-Session-Id/);
+    assert.equal((await response.json()).result.serverInfo.version, require('../package.json').version);
+});
+
+test('concurrent initialization reserves capacity and releases it after failure', async t => {
+    const server = new MCPServer(createSettings({ maxSessions: 1, maxConnections: 4 }));
+    const original = server.createProtocolRuntime.bind(server);
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    let entered;
+    const ready = new Promise(resolve => { entered = resolve; });
+    server.createProtocolRuntime = async () => {
+        entered();
+        await gate;
+        throw new Error('Simulated initialization failure');
+    };
+    await server.start();
+    t.after(() => { release(); return server.stop(); });
+    const baseUrl = `http://127.0.0.1:${server.getStatus().port}`;
+    const body = {
+        jsonrpc: '2.0', id: 1, method: 'initialize',
+        params: {
+            protocolVersion: '2025-11-25', capabilities: {},
+            clientInfo: { name: 'concurrent', version: '1' }
+        }
+    };
+    const first = postMcp(baseUrl, body);
+    await ready;
+    const second = await postMcp(baseUrl, body);
+    release();
+    assert.equal(second.status, 429);
+    assert.equal((await first).status, 500);
+    server.createProtocolRuntime = original;
+    await initializeSession(baseUrl);
+    assert.equal(server.getStatus().clients, 1);
+});
+
+test('non-object REST arguments are rejected before executing a no-argument tool', async t => {
+    const server = new MCPServer(createSettings({ enableRestApi: true }));
+    let executions = 0;
+    const tool = server.registeredTools.get('scene_get_current_scene');
+    assert.ok(tool);
+    tool.executor = { execute: async () => { executions++; return { success: true }; } };
+    await server.start();
+    t.after(() => server.stop());
+    for (const body of [null, [], 'invalid', 42, true]) {
+        const response = await fetch(`http://127.0.0.1:${server.getStatus().port}/api/scene/get_current_scene`, {
+            method: 'POST', headers: mcpHeaders(), body: JSON.stringify(body)
+        });
+        assert.equal(response.status, 400);
+    }
+    assert.equal(executions, 0);
+});

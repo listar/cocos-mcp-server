@@ -29,7 +29,7 @@ import { ValidationTools } from './tools/validation-tools';
 import { getToolAnnotations, requiresConfirmation } from './tools/tool-security';
 import { debugLog, setDebugLogging } from './logger';
 
-const SERVER_VERSION = '1.0.0';
+const SERVER_VERSION: string = require('../package.json').version;
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 const BASE_SERVER_INSTRUCTIONS = [
     'Use read-only query tools before mutation tools.',
@@ -126,6 +126,7 @@ export class MCPServer {
     private toolsList: ToolDefinition[] = [];
     private enabledToolNames: Set<string> | null = null;
     private activeRequests = 0;
+    private pendingInitializations = 0;
     private sessionCleanupTimer: NodeJS.Timeout | null = null;
 
     constructor(settings: MCPServerSettings) {
@@ -298,7 +299,10 @@ export class MCPServer {
             throw new ToolDisabledError(`Tool is disabled: ${toolName}`);
         }
 
-        const normalizedArgs: Record<string, unknown> = this.isRecord(args) ? { ...args } : {};
+        if (args !== undefined && !this.isRecord(args)) {
+            throw new ToolValidationError('Tool arguments must be a JSON object', []);
+        }
+        const normalizedArgs: Record<string, unknown> = { ...(args as Record<string, unknown> | undefined) };
         const validator = this.getValidator(toolName, registered.definition.inputSchema);
         if (!validator(normalizedArgs)) {
             throw new ToolValidationError(
@@ -431,6 +435,7 @@ export class MCPServer {
             if (origin) {
                 res.setHeader('Access-Control-Allow-Origin', origin);
                 res.setHeader('Vary', 'Origin');
+                res.setHeader('Access-Control-Expose-Headers', 'MCP-Session-Id, MCP-Protocol-Version');
             }
 
             if (req.method === 'OPTIONS') {
@@ -530,13 +535,15 @@ export class MCPServer {
             const maxSessions = Number.isFinite(this.settings.maxSessions)
                 ? this.settings.maxSessions
                 : this.settings.maxConnections;
-            if (this.protocolRuntimes.size >= maxSessions) {
+            if (this.protocolRuntimes.size + this.pendingInitializations >= maxSessions) {
                 this.sendJson(res, 429, { error: 'Maximum MCP sessions reached' });
                 return;
             }
 
-            const runtime = await this.createProtocolRuntime();
+            this.pendingInitializations++;
+            let runtime: ProtocolRuntime | undefined;
             try {
+                runtime = await this.createProtocolRuntime();
                 await runtime.transport.handleRequest(req, res, parsedBody);
                 const sessionId = runtime.transport.sessionId;
                 if (!sessionId) {
@@ -545,8 +552,10 @@ export class MCPServer {
                 runtime.lastActivity = Date.now();
                 this.protocolRuntimes.set(sessionId, runtime);
             } catch (error) {
-                await this.closeProtocolRuntime(runtime);
+                if (runtime) await this.closeProtocolRuntime(runtime);
                 throw error;
+            } finally {
+                this.pendingInitializations--;
             }
             return;
         }

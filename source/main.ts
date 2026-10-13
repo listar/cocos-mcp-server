@@ -6,6 +6,14 @@ import { debugLog, errorLog } from './logger';
 
 let mcpServer: MCPServer | null = null;
 let toolManager: ToolManager;
+let serverError = '';
+
+function startupErrorMessage(error: unknown, port: number): string {
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    if (code === 'EADDRINUSE') return `端口 ${port} 已被占用，请更换端口或停止占用它的服务。`;
+    if (code === 'EACCES' || code === 'EPERM') return `无法监听端口 ${port}，请检查系统权限。`;
+    return '服务器启动失败，请重新加载扩展后重试。';
+}
 
 export const methods: { [key: string]: (...any: any) => any } = {
     openPanel() {
@@ -14,11 +22,18 @@ export const methods: { [key: string]: (...any: any) => any } = {
 
     async startServer() {
         if (!mcpServer) {
-            errorLog('MCP', 'Server is not initialized');
-            return;
+            serverError = '服务器尚未初始化，请重新加载扩展后重试。';
+            return methods.getServerStatus();
         }
-        mcpServer.updateEnabledTools(toolManager.getEnabledTools());
-        await mcpServer.start();
+        serverError = '';
+        try {
+            mcpServer.updateEnabledTools(toolManager.getEnabledTools());
+            await mcpServer.start();
+        } catch (error) {
+            serverError = startupErrorMessage(error, mcpServer.getSettings().port);
+            errorLog('MCP', serverError);
+        }
+        return methods.getServerStatus();
     },
 
     async stopServer() {
@@ -27,12 +42,14 @@ export const methods: { [key: string]: (...any: any) => any } = {
             return;
         }
         await mcpServer.stop();
+        serverError = '';
+        return methods.getServerStatus();
     },
 
     getServerStatus() {
         const status = mcpServer ? mcpServer.getStatus() : { running: false, port: 0, clients: 0 };
         const settings = mcpServer ? mcpServer.getSettings() : readSettings();
-        return { ...status, settings };
+        return { ...status, settings, error: serverError };
     },
 
     async updateSettings(settings: Partial<MCPServerSettings>) {
@@ -46,9 +63,10 @@ export const methods: { [key: string]: (...any: any) => any } = {
 
         saveSettings(nextSettings);
         mcpServer = new MCPServer(nextSettings);
+        serverError = '';
         mcpServer.updateEnabledTools(toolManager.getEnabledTools());
         if (wasRunning) {
-            await mcpServer.start();
+            return methods.startServer();
         }
 
         return {
@@ -170,6 +188,7 @@ export const methods: { [key: string]: (...any: any) => any } = {
 };
 
 export function load() {
+    serverError = '';
     toolManager = new ToolManager();
 
     const settings = readSettings();
@@ -178,7 +197,7 @@ export function load() {
     mcpServer.updateEnabledTools(toolManager.getEnabledTools());
 
     if (settings.autoStart) {
-        mcpServer.start().catch(err => {
+        methods.startServer().catch((err: unknown) => {
             errorLog('MCP', 'Auto-start failed', err);
         });
     }
