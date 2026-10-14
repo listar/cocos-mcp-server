@@ -2,7 +2,7 @@
 
 module.exports = {
     "extension_name": "Cocos MCP 服务器",
-    "description": "适用于 Cocos Creator 3.8 的 AI MCP 服务器",
+    "description": "面向 Cocos Creator 3.8.8 的 AI 编辑器助手扩展。通过 MCP Streamable HTTP 连接 Codex、Claude Code、Cursor 等客户端，提供 14 类、153 个工具，支持场景与节点编辑、组件配置、预制体操作、资源管理和调试。内置服务器控制面板、工具启停管理和本地 Token 鉴权；高风险工具默认关闭，执行需显式确认。安装后从扩展菜单打开 MCP 面板，启动服务并配置客户端连接。",
     "panel_title": "MCP 服务器",
     "open_panel": "打开 MCP 面板",
     "start_server": "启动服务器",

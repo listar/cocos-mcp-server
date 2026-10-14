@@ -25,7 +25,7 @@ The current implementation provides **153 tools in 14 categories**, uses the off
 | Electron | `31.3.1` bundled with Cocos Creator 3.8.8 |
 | Node.js | `20.15.1` bundled with Cocos Creator 3.8.8 |
 | Chromium | `126.0.6478.185` |
-| MCP SDK | `@modelcontextprotocol/sdk@1.29.x`, initialize/tools-list smoke tested in that runtime |
+| MCP SDK | `@modelcontextprotocol/sdk@1.32.1`, initialize/tools-list smoke tested in that runtime |
 | MCP transport | Streamable HTTP |
 | Bind address | `127.0.0.1` |
 

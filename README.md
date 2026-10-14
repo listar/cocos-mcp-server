@@ -25,7 +25,7 @@
 | Electron | `31.3.1`（Cocos Creator 3.8.8 内置） |
 | Node.js | `20.15.1`（Cocos Creator 3.8.8 内置） |
 | Chromium | `126.0.6478.185` |
-| MCP SDK | `@modelcontextprotocol/sdk@1.29.x`，已在上述 Electron 运行时完成 initialize/tools-list 冒烟 |
+| MCP SDK | `@modelcontextprotocol/sdk@1.32.1`，已在上述 Electron 运行时完成 initialize/tools-list 冒烟 |
 | MCP 传输 | Streamable HTTP |
 | 监听地址 | `127.0.0.1` |
 

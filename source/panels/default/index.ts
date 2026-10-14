@@ -8,13 +8,16 @@ import {
     defineComponent,
     ref,
     computed,
+    nextTick,
     onMounted,
     onUnmounted,
     watch
 } from 'vue';
 import { errorLog } from '../../logger';
+import { isDangerousByDefault, getToolAnnotations } from '../../tools/tool-security';
 
 const panelDataMap = new WeakMap<any, App>();
+const extensionVersion: string = require('../../../package.json').version;
 
 interface ToolConfig {
     category: string;
@@ -39,20 +42,11 @@ interface ServerSettings {
 }
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
-    scene: 'Scene Tools',
-    node: 'Node Tools',
-    component: 'Component Tools',
-    prefab: 'Prefab Tools',
-    project: 'Project Tools',
-    debug: 'Debug Tools',
-    preferences: 'Preferences Tools',
-    server: 'Server Tools',
-    broadcast: 'Broadcast Tools',
-    sceneAdvanced: 'Advanced Scene Tools',
-    sceneView: 'Scene View Tools',
-    referenceImage: 'Reference Image Tools',
-    assetAdvanced: 'Advanced Asset Tools',
-    validation: 'Validation Tools'
+    scene: '场景', node: '节点', component: '组件', prefab: '预制体',
+    project: '项目与资源', debug: '调试', preferences: '偏好设置',
+    server: '服务器', broadcast: '广播', sceneAdvanced: '高级场景',
+    sceneView: '场景视图', referenceImage: '参考图', assetAdvanced: '高级资源',
+    validation: '数据校验'
 };
 
 module.exports = Editor.Panel.define({
@@ -100,6 +94,34 @@ module.exports = Editor.Panel.define({
 
                 const availableTools = ref<ToolConfig[]>([]);
                 const toolCategories = ref<string[]>([]);
+                const searchQuery = ref('');
+                const toolFilter = ref('all');
+                const toolsBusy = ref(false);
+                const toolsLoaded = ref(false);
+                const toolMessage = ref('');
+                const toolError = ref('');
+                const pendingRisk = ref<ToolConfig | null>(null);
+                const riskPanel = ref<HTMLElement | null>(null);
+                const collapsedCategories = ref<string[]>([]);
+                const qualifiedName = (tool: Pick<ToolConfig, 'category' | 'name'>) => tool.category + '_' + tool.name;
+                const isRisky = (tool: ToolConfig) => isDangerousByDefault(qualifiedName(tool));
+                const isReadOnly = (tool: ToolConfig) => getToolAnnotations(qualifiedName(tool)).readOnlyHint;
+                const filteredTools = computed(() => availableTools.value.filter(tool => {
+                    const query = searchQuery.value.trim().toLowerCase();
+                    const matches = (qualifiedName(tool) + ' ' + tool.description + ' ' +
+                        (CATEGORY_DISPLAY_NAMES[tool.category] ?? '')).toLowerCase().includes(query);
+                    return matches && (toolFilter.value === 'all' ||
+                        (toolFilter.value === 'enabled' && tool.enabled) ||
+                        (toolFilter.value === 'disabled' && !tool.enabled) ||
+                        (toolFilter.value === 'risk' && isRisky(tool)));
+                }));
+                const visibleCategories = computed(() => toolCategories.value.filter(category =>
+                    filteredTools.value.some(tool => tool.category === category)));
+                const toggleCategory = (category: string) => {
+                    collapsedCategories.value = collapsedCategories.value.includes(category)
+                        ? collapsedCategories.value.filter(item => item !== category)
+                        : [...collapsedCategories.value, category];
+                };
 
                 const statusClass = computed(() => ({
                     running: serverRunning.value,
@@ -112,7 +134,7 @@ module.exports = Editor.Panel.define({
 
                 const switchTab = (tabName: string) => {
                     activeTab.value = tabName;
-                    if (tabName === 'tools') {
+                    if (tabName === 'tools' && !toolsLoaded.value) {
                         loadToolManagerState();
                     }
                 };
@@ -227,74 +249,74 @@ module.exports = Editor.Panel.define({
                 };
 
                 const loadToolManagerState = async () => {
+                    if (toolsBusy.value) return;
+                    toolsBusy.value = true;
+                    toolError.value = '';
                     try {
                         const result = await Editor.Message.request('cocos-mcp-server', 'getToolManagerState');
-                        if (result?.success) {
-                            availableTools.value = result.availableTools ?? [];
-                            const categories = new Set(availableTools.value.map(t => t.category));
-                            toolCategories.value = Array.from(categories);
-                        }
+                        if (!result?.success) throw new Error('Load failed');
+                        availableTools.value = result.availableTools ?? [];
+                        toolCategories.value = Array.from(new Set(availableTools.value.map(t => t.category)));
+                        toolsLoaded.value = true;
                     } catch (error) {
+                        toolError.value = '工具列表加载失败，请重试。';
                         errorLog('MCP Panel', 'Failed to load tool manager state', error);
+                    } finally {
+                        toolsBusy.value = false;
                     }
                 };
 
-                const updateToolStatus = async (category: string, name: string, enabled: boolean) => {
-                    // Optimistic update
-                    const toolIndex = availableTools.value.findIndex(t => t.category === category && t.name === name);
-                    if (toolIndex !== -1) {
-                        availableTools.value[toolIndex].enabled = enabled;
-                        availableTools.value = [...availableTools.value];
+                const applyToolUpdates = async (tools: ToolConfig[], enabled: boolean) => {
+                    if (toolsBusy.value) return;
+                    const updates = tools.filter(tool => tool.enabled !== enabled)
+                        .map(tool => ({ category: tool.category, name: tool.name, enabled }));
+                    if (!updates.length) {
+                        toolMessage.value = '没有需要更改的工具。批量启用会跳过高风险工具。';
+                        return;
                     }
+                    toolsBusy.value = true;
+                    toolError.value = '';
+                    toolMessage.value = '';
                     try {
-                        const result = await Editor.Message.request('cocos-mcp-server', 'updateToolStatus', category, name, enabled);
-                        if (!result?.success && toolIndex !== -1) {
-                            // Roll back on failure
-                            availableTools.value[toolIndex].enabled = !enabled;
-                            availableTools.value = [...availableTools.value];
-                        }
+                        const result = await Editor.Message.request('cocos-mcp-server', 'updateToolStatusBatch', updates);
+                        if (!result?.success) throw new Error('Save failed');
+                        const names = new Set(updates.map(qualifiedName));
+                        availableTools.value = availableTools.value.map(tool =>
+                            names.has(qualifiedName(tool)) ? { ...tool, enabled } : tool);
+                        toolMessage.value = '已保存：' + updates.length + ' 个工具已' + (enabled ? '启用' : '停用') + '。';
                     } catch (error) {
-                        // Roll back on error
-                        if (toolIndex !== -1) {
-                            availableTools.value[toolIndex].enabled = !enabled;
-                            availableTools.value = [...availableTools.value];
-                        }
-                        errorLog('MCP Panel', 'Failed to update tool status', error);
+                        toolError.value = '保存失败，尚未确认更改。请重新加载列表核对后重试。';
+                        errorLog('MCP Panel', 'Failed to update tools', error);
+                    } finally {
+                        toolsBusy.value = false;
                     }
                 };
 
-                const saveChanges = async () => {
-                    try {
-                        const updates = availableTools.value.map(tool => ({
-                            category: String(tool.category),
-                            name: String(tool.name),
-                            enabled: Boolean(tool.enabled)
-                        }));
-                        await Editor.Message.request('cocos-mcp-server', 'updateToolStatusBatch', updates);
-                    } catch (error) {
-                        errorLog('MCP Panel', 'Failed to save tool changes', error);
+                const updateToolStatus = (tool: ToolConfig) => {
+                    if (toolsBusy.value) return;
+                    if (!tool.enabled && isRisky(tool)) {
+                        pendingRisk.value = tool;
+                        void nextTick(() => {
+                            riskPanel.value?.scrollIntoView({ block: 'nearest' });
+                            riskPanel.value?.focus();
+                        });
+                        return;
                     }
+                    void applyToolUpdates([tool], !tool.enabled);
                 };
-
-                const selectAllTools = async () => {
-                    availableTools.value.forEach(t => { t.enabled = true; });
-                    await saveChanges();
+                const confirmRisk = async () => {
+                    const tool = pendingRisk.value;
+                    pendingRisk.value = null;
+                    if (tool) await applyToolUpdates([tool], true);
                 };
-
-                const deselectAllTools = async () => {
-                    availableTools.value.forEach(t => { t.enabled = false; });
-                    await saveChanges();
-                };
-
-                const toggleCategoryTools = async (category: string, enabled: boolean) => {
-                    availableTools.value.forEach(t => {
-                        if (t.category === category) t.enabled = enabled;
-                    });
-                    await saveChanges();
-                };
-
-                const getToolsByCategory = (category: string) => {
-                    return availableTools.value.filter(t => t.category === category);
+                const bulkTools = (enabled: boolean, category?: string) => applyToolUpdates(
+                    filteredTools.value.filter(tool => (!category || tool.category === category) &&
+                        (!enabled || !isRisky(tool))), enabled);
+                const getToolsByCategory = (category: string) =>
+                    filteredTools.value.filter(tool => tool.category === category);
+                const categorySummary = (category: string) => {
+                    const tools = availableTools.value.filter(tool => tool.category === category);
+                    return tools.filter(tool => tool.enabled).length + ' / ' + tools.length + ' 已启用';
                 };
 
                 const getCategoryDisplayName = (category: string): string => {
@@ -349,6 +371,7 @@ module.exports = Editor.Panel.define({
                 });
 
                 return {
+                    extensionVersion,
                     activeTab,
                     serverRunning,
                     serverStatusText,
@@ -371,10 +394,10 @@ module.exports = Editor.Panel.define({
                     copyToken,
                     loadToolManagerState,
                     updateToolStatus,
-                    selectAllTools,
-                    deselectAllTools,
-                    saveChanges,
-                    toggleCategoryTools,
+                    searchQuery, toolFilter, toolsBusy, toolsLoaded, toolMessage, toolError,
+                    pendingRisk, riskPanel, confirmRisk, isRisky, isReadOnly, qualifiedName,
+                    filteredTools, visibleCategories, collapsedCategories, toggleCategory,
+                    bulkTools, categorySummary,
                     getToolsByCategory,
                     getCategoryDisplayName
                 };

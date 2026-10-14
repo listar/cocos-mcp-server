@@ -399,3 +399,59 @@ ui-button.secondary:hover {
     margin: 0;
     font-size: 14px;
 }
+
+/* Adaptive tool management and introduction */
+.mcp-server-panel { padding: 16px; overflow: hidden; }
+#app { flex: 1; min-height: 0; }
+.mcp-app { min-height: 0; }
+.tab-navigation { flex-shrink: 0; margin-bottom: 8px; }
+.tab-button { padding: 10px 14px; }
+.tab-content { min-height: 0; padding: 8px 0; }
+.tool-manager { height: auto; padding: 12px; }
+.tools-heading, .bulk-actions, .tool-filters, .about-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tools-heading { justify-content: space-between; margin-bottom: 12px; }
+.tools-heading h3 { margin-bottom: 4px; }
+.muted, .safety-note { color: var(--color-normal-text-secondary, #aaa); font-size: 12px; line-height: 1.6; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.stat-grid > div { padding: 12px; border: 1px solid var(--color-normal-border, #444); border-radius: 6px; }
+.stat-grid strong, .stat-grid span { display: block; }
+.stat-grid strong { font-size: 22px; margin-bottom: 4px; }
+.stat-grid span { font-size: 12px; }
+.tool-filters input { flex: 1; min-width: 140px; }
+.tool-filters input, .tool-filters select, .action-button, .tool-switch {
+    font: inherit; color: var(--color-normal-text, #ddd); background: var(--color-normal-fill, #303030);
+    border: 1px solid var(--color-normal-border, #555); border-radius: 4px; padding: 7px 10px;
+}
+.action-button, .tool-switch { cursor: pointer; }
+.action-button:hover, .tool-switch:hover { border-color: var(--color-primary, #549cdb); }
+button:disabled { opacity: .5; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--color-primary, #549cdb); outline-offset: 2px; }
+.compact { padding: 4px 8px; font-size: 11px; }
+.save-feedback { min-height: 18px; color: var(--color-success-fill, #79ba83); font-size: 12px; }
+.error-note, .risk-confirm { padding: 12px; margin-bottom: 12px; border: 1px solid #ab8248; border-radius: 5px; line-height: 1.6; }
+.risk-confirm code { display: block; overflow-wrap: anywhere; margin-top: 6px; }
+.tool-category { box-shadow: none; border: 1px solid var(--color-normal-border, #444); margin-bottom: 12px; }
+.category-header { background: var(--color-normal-fill-emphasis, #363636); color: inherit; padding: 10px; gap: 8px; flex-wrap: wrap; }
+.category-collapse { flex: 1; min-width: 120px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.category-collapse span, .category-collapse small { display: block; }
+.category-collapse small { font-weight: normal; margin: 4px 0 0 12px; opacity: .7; }
+.tool-item { padding: 12px; align-items: flex-start; gap: 12px; }
+.tool-info { min-width: 0; }
+.tool-name { overflow-wrap: anywhere; font-size: 12px; }
+.tool-description { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.tool-badges { margin: 5px 0; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; background: var(--color-normal-fill-emphasis, #3a3a3a); font-size: 11px; }
+.badge.risk { color: #edc788; background: #574329; }
+.tool-switch { flex-shrink: 0; font-size: 11px; }
+.tool-switch.enabled { border-color: #57916c; color: #9cdbad; }
+.about-content { line-height: 1.75; }
+.about-content h3 { margin-bottom: 10px; }
+.about-hero h3 { font-size: 22px; margin: 12px 0 8px; }
+.about-meta { font-size: 12px; color: var(--color-normal-text-secondary, #aaa); }
+.about-meta span { border: 1px solid var(--color-normal-border, #444); padding: 3px 8px; border-radius: 4px; }
+.feature-list { margin: 0; }
+.feature-list dt { font-weight: 600; margin-top: 12px; }
+.feature-list dd { margin: 4px 0 0; color: var(--color-normal-text-secondary, #aaa); }
+.steps, .about-list { padding-left: 22px; }
+.steps li, .about-list li { margin-bottom: 10px; }
+.about-content code { overflow-wrap: anywhere; }

@@ -2,7 +2,7 @@
 
 module.exports = {
     "extension_name": "Cocos MCP Server",
-    "description": "AI MCP Server for Cocos Creator 3.8",
+    "description": "AI editor assistant extension for Cocos Creator 3.8.8. Connect Codex, Claude Code, Cursor, and other clients through MCP Streamable HTTP. Includes 153 tools in 14 categories for scenes, nodes, components, prefabs, assets, and debugging, plus a server panel and tool management. Uses local token authentication; high-risk tools are disabled by default and require explicit confirmation. After installation, open the MCP panel from the Extensions menu, start the server, and configure your client.",
     "panel_title": "MCP Server",
     "open_panel": "Open MCP Panel",
     "start_server": "Start Server",

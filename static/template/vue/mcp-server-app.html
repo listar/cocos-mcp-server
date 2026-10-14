@@ -7,6 +7,9 @@
         <button class="tab-button" :class="{ active: activeTab === 'tools' }" @click="switchTab('tools')">
             <span>工具管理</span>
         </button>
+        <button class="tab-button" :class="{ active: activeTab === 'about' }" @click="switchTab('about')">
+            <span>关于 MCP</span>
+        </button>
     </div>
     
     <!-- 服务器选项卡 -->
@@ -14,6 +17,10 @@
         <section class="server-status">
             <h3>服务器状态</h3>
             <div class="status-info">
+                <ui-prop>
+                    <ui-label slot="label">版本</ui-label>
+                    <ui-label slot="content">v{{ extensionVersion }}</ui-label>
+                </ui-prop>
                 <ui-prop>
                     <ui-label slot="label">状态</ui-label>
                     <ui-label slot="content" class="status-value" :class="statusClass">{{ serverStatusText }}</ui-label>
@@ -112,55 +119,112 @@
         </footer>
     </div>
     
-    <!-- 工具管理选项卡 -->
     <div class="tab-content" v-show="activeTab === 'tools'">
-        <section class="tool-manager">
-            <div class="tool-manager-header">
-                <h3>工具管理</h3>
+        <section class="tool-manager" :aria-busy="toolsBusy">
+            <div class="tools-heading"><div><h3>工具管理</h3><p class="muted">按任务开放工具。更改即时保存，无需再次提交。</p></div>
+                <button class="action-button" @click="loadToolManagerState" :disabled="toolsBusy">重新加载</button>
             </div>
-            
-            <div class="tools-section">
-                <div class="tools-section-header">
-                    <div class="tools-section-title">
-                        <h4>可用工具</h4>
-                        <div class="tools-stats">
-                            {{ totalTools }} 个工具
-                            ({{ enabledToolCount }} 启用 / {{ disabledToolCount }} 禁用)
-                        </div>
-                    </div>
-                    <div class="tools-section-controls">
-                        <ui-button @click="selectAllTools" class="small">全选</ui-button>
-                        <ui-button @click="deselectAllTools" class="small">取消全选</ui-button>
-                        <ui-button @click="saveChanges" class="primary">保存更改</ui-button>
+            <div class="stat-grid">
+                <div><strong>{{ totalTools }}</strong><span>全部工具</span></div>
+                <div><strong>{{ enabledToolCount }}</strong><span>已启用</span></div>
+                <div><strong>{{ disabledToolCount }}</strong><span>已停用</span></div>
+            </div>
+            <div class="tool-filters">
+                <input v-model="searchQuery" type="search" aria-label="搜索工具" placeholder="搜索名称、说明或分类…" />
+                <select v-model="toolFilter" aria-label="工具状态筛选">
+                    <option value="all">全部状态</option><option value="enabled">已启用</option>
+                    <option value="disabled">已停用</option><option value="risk">高风险</option>
+                </select>
+            </div>
+            <p class="muted">显示 {{ filteredTools.length }} / {{ totalTools }} 个工具 · 批量操作仅影响当前筛选结果。</p>
+            <div class="bulk-actions">
+                <button class="action-button" @click="bulkTools(true)" :disabled="toolsBusy || !filteredTools.length">启用筛选内常规工具</button>
+                <button class="action-button" @click="bulkTools(false)" :disabled="toolsBusy || !filteredTools.length">停用筛选结果</button>
+            </div>
+            <p class="safety-note">高风险工具需逐项确认启用；调用时仍须 confirm: true。常规工具也可能修改场景，请按需开启。</p>
+            <p role="status" class="save-feedback">{{ toolsBusy ? '正在处理…' : toolMessage }}</p>
+            <div v-if="toolError" role="alert" class="error-note">{{ toolError }}</div>
+            <div v-if="pendingRisk" ref="riskPanel" tabindex="-1" class="risk-confirm" role="alert">
+                <strong>确认启用高风险工具？</strong><code>{{ qualifiedName(pendingRisk) }}</code>
+                <p>此工具可能删除资源、执行代码或访问外部环境。请确认当前任务需要它，并先保存项目。</p>
+                <div class="bulk-actions"><button class="action-button" @click="confirmRisk" :disabled="toolsBusy">确认启用</button>
+                    <button class="action-button" @click="pendingRisk = null">取消</button></div>
+            </div>
+            <div v-if="!toolsBusy && !filteredTools.length" class="empty-state">
+                <h3>{{ toolsLoaded ? '没有匹配的工具' : '工具列表尚未加载' }}</h3>
+                <p>尝试更换关键词、调整状态筛选或重新加载。</p>
+            </div>
+            <div v-for="category in visibleCategories" :key="category" class="tool-category">
+                <div class="category-header">
+                    <button class="category-collapse" @click="toggleCategory(category)" :aria-expanded="!collapsedCategories.includes(category)">
+                        <span>{{ collapsedCategories.includes(category) ? '▸' : '▾' }} {{ getCategoryDisplayName(category) }}</span>
+                        <small>{{ categorySummary(category) }}</small>
+                    </button>
+                    <div class="bulk-actions">
+                        <button class="action-button compact" @click="bulkTools(true, category)" :disabled="toolsBusy">启用常规</button>
+                        <button class="action-button compact" @click="bulkTools(false, category)" :disabled="toolsBusy">停用</button>
                     </div>
                 </div>
-                
-                <div class="tools-container">
-                    <div v-for="category in toolCategories" :key="category" class="tool-category">
-                        <div class="category-header">
-                            <h5>{{ getCategoryDisplayName(category) }}</h5>
-                            <div class="category-controls">
-                                <ui-button @click="toggleCategoryTools(category, true)" class="small">全选</ui-button>
-                                <ui-button @click="toggleCategoryTools(category, false)" class="small">取消全选</ui-button>
-                            </div>
+                <div v-show="!collapsedCategories.includes(category)">
+                    <div v-for="tool in getToolsByCategory(category)" :key="tool.name" class="tool-item" :class="{ 'tool-disabled': !tool.enabled }">
+                        <div class="tool-info">
+                            <code class="tool-name">{{ qualifiedName(tool) }}</code>
+                            <div class="tool-badges"><span class="badge" :class="{ risk: isRisky(tool) }">{{ isRisky(tool) ? '高风险 · 需确认' : isReadOnly(tool) ? '只读' : '可修改' }}</span></div>
+                            <div class="tool-description">{{ tool.description }}</div>
                         </div>
-                        <div class="tool-items">
-                            <div v-for="tool in getToolsByCategory(category)" :key="tool.name" class="tool-item">
-                                <ui-checkbox 
-                                    :value="tool.enabled"
-                                    @change="(event) => updateToolStatus(category, tool.name, event.target.checked)"
-                                ></ui-checkbox>
-                                <div class="tool-info">
-                                    <div class="tool-name">{{ tool.name }}</div>
-                                    <div class="tool-description">{{ tool.description }}</div>
-                                </div>
-                            </div>
-                        </div>
+                        <button class="tool-switch" role="switch" :aria-checked="tool.enabled" :aria-label="qualifiedName(tool)"
+                            :class="{ enabled: tool.enabled }" :disabled="toolsBusy" @click="updateToolStatus(tool)">{{ tool.enabled ? '已启用' : '已停用' }}</button>
                     </div>
                 </div>
             </div>
-            
+        </section>
+    </div>
 
+    <div class="tab-content about-content" v-show="activeTab === 'about'">
+        <section class="about-hero">
+            <span class="badge">编辑器 AI 助手 · v{{ extensionVersion }}</span>
+            <h3>Cocos MCP Server</h3>
+            <p>让 AI 在 Cocos Creator 中理解项目、编辑场景并验证结果。通过标准 MCP 协议，将客户端的任务请求转换为编辑器操作。</p>
+            <div class="about-meta"><span>Cocos Creator 3.8.8</span><span>{{ toolCategories.length }} 类工具</span><span>{{ totalTools }} 个工具</span></div>
+        </section>
+        <section><h3>它能帮你做什么</h3>
+            <dl class="feature-list">
+                <dt>搭建场景与 UI</dt><dd>查询层级、创建与调整节点、配置组件属性，协助构建可在编辑器中继续维护的场景和界面。</dd>
+                <dt>处理预制体与资源</dt><dd>查询项目资源，加载、实例化、还原与复制预制体；高级资源操作按需启用。</dd>
+                <dt>辅助排查与验证</dt><dd>检查节点和组件状态、调整场景视图、执行数据校验，并通过后续查询确认修改结果。</dd>
+                <dt>控制 AI 的操作范围</dt><dd>按工具启停控制当前可用能力。全部停用后不会向客户端开放工具；可以在任务结束后关闭不再需要的能力。</dd>
+            </dl>
+        </section>
+        <section><h3>首次连接 · 4 步开始</h3>
+            <ol class="steps">
+                <li>打开「服务器」，确认端口与设置，点击「启动服务器」。</li>
+                <li>复制 HTTP URL 和访问令牌。地址形如 <code>http://127.0.0.1:端口/mcp</code>。</li>
+                <li>在支持 Streamable HTTP 的 MCP 客户端中添加服务器，并设置请求头 <code>Authorization: Bearer &lt;访问令牌&gt;</code>。Codex、Claude Code、Cursor 的具体配置入口以各客户端为准。</li>
+                <li>在「工具管理」启用任务需要的工具，让 AI 先查询当前场景，再执行修改并验证。</li>
+            </ol>
+            <p class="muted">服务器运行时才能连接。无需为 MCP 开启 REST API；配置通常保存在当前项目的 settings 目录中。</p>
+        </section>
+        <section><h3>推荐的协作方式</h3>
+            <p>先说明目标与限制，例如：“先查看当前 Canvas 层级，再创建一个静态设置面板，保留已有节点，并查询结果确认布局。”</p>
+            <p>单个、明确、固定的 UI 优先使用节点层级与组件；批量、数据驱动或运行时动态界面适合脚本、组件与 Prefab 模板。可以在服务器设置中调整「静态 UI 层级优先」。</p>
+            <p>编辑前保存项目，复杂修改分步进行。某些编辑器命令只代表已派发，需后续查询确认完成。</p>
+        </section>
+        <section><h3>安全与访问边界</h3>
+            <ul class="about-list">
+                <li>仅监听本机 127.0.0.1；客户端通过 Token 鉴权。请勿把令牌贴入截图、日志或共享文档。</li>
+                <li>浏览器来源默认不放行，需要时填写明确的允许来源。</li>
+                <li>高风险工具默认关闭，启用与实际调用确认是两个独立步骤；调用必须提供 confirm: true。</li>
+                <li>内置参数校验、请求大小、并发、会话及执行超时限制。超时不表示编辑器操作已撤销，重试前先查询结果。</li>
+            </ul>
+        </section>
+        <section><h3>遇到问题时</h3>
+            <dl class="feature-list">
+                <dt>服务器启动失败</dt><dd>查看服务器状态提示；端口被占用时换一个端口并保存。</dd>
+                <dt>客户端无法连接或鉴权失败</dt><dd>确认服务器正在运行、地址以 /mcp 结尾，且请求头使用当前项目的访问令牌。</dd>
+                <dt>看不到工具或更改未显示</dt><dd>检查工具是否启用，清除工具页筛选；必要时让客户端刷新工具列表或重新连接。</dd>
+                <dt>调用失败或执行超时</dt><dd>检查目标场景是否就绪、参数及确认字段是否完整。先核对编辑器实际状态，再决定是否重试。</dd>
+            </dl>
+            <p class="muted">已验证编辑器版本为 3.8.8；其他版本需另行验证兼容性。</p>
         </section>
     </div>
 </div>
